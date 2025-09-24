@@ -43,7 +43,7 @@ mapeamento_colunas = {
     "Horário Padrão": "horario_padrao", "Conselho (opcional)": "coren",
     "Período de Afastamento": "periodo_afastamento"
 }
-df_ativos.rename(columns=mapeamento_colunas, inplace=True)s
+df_ativos.rename(columns=mapeamento_colunas, inplace=True)
 df_ativos['ativo'] = True
 df_ativos['matricula'] = df_ativos['matricula'].astype(str)
 
