@@ -12,7 +12,7 @@ class UserRegistrationScreen:
         self.user_var = tk.StringVar()
         self.pass_var = tk.StringVar()
         self.confirm_pass_var = tk.StringVar()
-        self.role_var = tk.StringVar(value='user') # Papel padrão é 'user'
+        self.role_var = tk.StringVar(value='user')
 
         style = ttk.Style(self.root)
         style.configure('Accent.TButton', font=('Helvetica', 10, 'bold'))
