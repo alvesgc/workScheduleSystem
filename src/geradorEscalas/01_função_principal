@@ -1,0 +1,162 @@
+
+from funções import selecionar_arquivo_e_pasta,selecionar_setores,preencher_escala,encontrar_titulos,ocultar_linhas_entre_blocos,carregar_historico, limpar_nome_para_arquivo
+from funções import aplicar_afastamentos,atualizar_historico,atualizar_turnos_com_logica_prioritaria,limpar_cadastro_colaboradores,ocultar_ate_fim,ocultar_blocos_vazios
+
+from openpyxl.utils import get_column_letter
+from openpyxl import load_workbook
+import os
+import pandas as pd
+import calendar
+from tkinter import simpledialog, messagebox
+
+
+def executar():
+    caminho_modelo, pasta_destino = selecionar_arquivo_e_pasta()
+
+    modelo_tipo = simpledialog.askstring("Modelo", "Qual modelo deseja gerar?\n1 - Misto\n2 - Diarista")
+    if modelo_tipo not in ["1", "2"]:
+        messagebox.showerror("Erro", "Modelo inválido. Digite 1 ou 2.")
+        return
+
+    try:
+        mes = int(simpledialog.askstring("Mês", "Digite o número do mês (1-12):"))
+        ano = int(simpledialog.askstring("Ano", "Digite o ano (ex: 2025):"))
+    except:
+        messagebox.showerror("Erro", "Mês ou ano inválido.")
+        return
+
+    nome_mes = calendar.month_name[mes].upper()
+    dias_mes = calendar.monthrange(ano, mes)[1]
+    dias_semana_pt = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"]
+    dias_semana = [dias_semana_pt[calendar.weekday(ano, mes, d)] for d in range(1, dias_mes + 1)]
+
+    wb = load_workbook(caminho_modelo)
+
+    ws_escala_temp = wb["ESCALA MODELO MISTO"] if modelo_tipo == "1" else wb["ESCALA MODELO DIARISTA"]
+    atualizar_turnos_com_logica_prioritaria(wb, mes, ano)
+
+    df_colab = pd.read_excel(caminho_modelo, sheet_name="Cadastro_Colaboradores")
+    df_colab = df_colab[df_colab["Ativo?"].str.upper() == "SIM"]
+    setores_disponiveis = sorted(df_colab["Setor"].dropna().unique())
+
+    setores_selecionados = selecionar_setores(setores_disponiveis)
+    if not setores_selecionados:
+        messagebox.showwarning("Aviso", "Nenhum setor selecionado. Encerrando.")
+        return
+
+    aba_base = "ESCALA MODELO MISTO" if modelo_tipo == "1" else "ESCALA MODELO DIARISTA"
+    ws_modelo = wb[aba_base]
+    ws_escala = wb.copy_worksheet(ws_modelo)
+    ws_escala.title = f"ESCALA_{nome_mes}"
+
+    ws_hist = wb["Historico_Turnos"]
+    historico_turnos = carregar_historico(ws_hist)
+    novos_turnos = {}
+
+    afastados = aplicar_afastamentos(df_colab, mes, ano, dias_mes)
+    afastados = {nome.strip().lower(): dias for nome, dias in afastados.items()}
+    print("\n--- AFASTADOS ---")
+    for nome, dias in afastados.items():
+        print(f"{nome} -> {dias}")
+    print("------------------\n")
+
+    for i in range(dias_mes):
+        col = get_column_letter(6 + i)
+        ws_escala[f"{col}5"] = i + 1
+        ws_escala[f"{col}6"] = dias_semana[i]
+
+    titulos = encontrar_titulos(ws_escala)
+
+    def obter_turno_real(row):
+        escala = str(row.get('Escala', '') or '').strip().lower()
+        if escala == "diarista":
+            return "diarista"
+        turno_k = str(row.get('Resultado Esperado', '') or '').strip().lower()
+        if turno_k == "nan":
+            turno_k = ""
+        turno_f = str(row.get('Tipo de Turno', '')).strip().lower()
+        return turno_k if turno_k else turno_f
+
+    if modelo_tipo == "1":
+        mapa = {
+            "título 1": "diarista",
+            "título diurno 1": "diurno 1",
+            "título diurno 2": "diurno 2",
+            "título noturno 1": "noturno 1",
+            "título noturno 2": "noturno 2",
+        }
+
+        setor_turno_colabs = {}
+        for _, row in df_colab.iterrows():
+            setor = str(row["Setor"]).strip().lower()
+            turno_real = obter_turno_real(row)
+            chave = (setor, turno_real)
+            if chave not in setor_turno_colabs:
+                setor_turno_colabs[chave] = []
+            setor_turno_colabs[chave].append(row.to_dict())
+
+        for titulo, linha in titulos:
+            grupo = mapa.get(titulo)
+            if not grupo:
+                continue
+
+            for setor in setores_selecionados:
+                chave = (setor.strip().lower(), grupo)
+                colabs = setor_turno_colabs.get(chave, [])
+                if not colabs:
+                    continue
+
+                preencher_escala(
+                    ws_escala, linha, colabs,
+                    dias_mes, dias_semana, setor,
+                    historico_turnos, novos_turnos, afastados, mes, ano
+                )
+
+    else:
+        for i, setor in enumerate(setores_selecionados):
+            if i >= len(titulos):
+                break
+            titulo, linha_titulo = titulos[i]
+            df_setor = df_colab[df_colab["Setor"].str.strip().str.lower() == setor.strip().lower()]
+            if df_setor.empty:
+                continue
+            preencher_escala(
+                ws_escala, linha_titulo, df_setor.to_dict("records"),
+                dias_mes, dias_semana, setor,
+                historico_turnos, novos_turnos, afastados, mes, ano
+            )
+
+    ocultar_blocos_vazios(ws_escala, titulos)
+    ocultar_linhas_entre_blocos(ws_escala, titulos)
+    ocultar_ate_fim(ws_escala)
+
+    lista_novos_turnos = []
+    for _, row in df_colab.iterrows():
+        nome = row['Nome']
+        turno = novos_turnos.get(nome, None)
+        if turno:
+            lista_novos_turnos.append({
+                "Nome": nome,
+                "Matrícula": row.get('Matrícula', ''),
+                "Setor": row.get('Setor', ''),
+                "Turno": turno,
+                "Último Dia Trabalhado": ""
+            })
+
+    atualizar_historico(ws_hist, lista_novos_turnos)
+    limpar_cadastro_colaboradores(wb, setores_selecionados)
+
+    for aba in wb.sheetnames:
+        if aba in ["ESCALA MODELO MISTO", "ESCALA MODELO DIARISTA"]:
+            wb[aba].sheet_state = "hidden"
+        elif aba not in [ws_escala.title, "Cadastro_Colaboradores", "Historico_Turnos"]:
+            del wb[aba]
+
+    setores_limpos = [limpar_nome_para_arquivo(s) for s in setores_selecionados]
+
+    nome_final = f"ESCALA_{nome_mes}_{ano}_{'_'.join(setores_limpos)}.xlsx"
+    wb.save(os.path.join(pasta_destino, nome_final))
+    messagebox.showinfo("Concluído", f"Escala salva como {nome_final}")
+
+if __name__ == "__main__":
+    executar()
