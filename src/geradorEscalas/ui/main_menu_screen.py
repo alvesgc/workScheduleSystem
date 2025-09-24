@@ -1,4 +1,6 @@
-# --- TELA DE MENU PRINCIPAL ---
+import tkinter as tk
+from tkinter import ttk
+
 class MainMenuScreen:
     def __init__(self, root, choice_callback):
         self.root = root

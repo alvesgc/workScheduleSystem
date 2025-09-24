@@ -1,5 +1,3 @@
-# main.py
-
 import tkinter as tk
 from tkinter import messagebox, filedialog
 import pandas as pd
@@ -7,9 +5,8 @@ import sys
 import mysql.connector
 import bcrypt
 
-# Importa as classes da interface e as funções de utilitários
-from ui import WizardApp, LoginScreen, MainMenuScreen
-import utils as util
+from .ui import WizardApp, LoginScreen, MainMenuScreen
+from . import utils as util
 
 # --- CONFIGURAÇÕES DE BANCO DE DADOS ---
 DB_CONFIG = {

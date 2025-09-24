@@ -1,3 +1,5 @@
+import tkinter as tk
+from tkinter import ttk
 class LoginScreen:
     def __init__(self, root, login_callback):
         self.root = root
