@@ -1,4 +1,3 @@
-# interface_wizard.py (VERSÃO COM DESIGN REFINADO)
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
