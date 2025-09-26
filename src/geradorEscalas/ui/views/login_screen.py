@@ -1,6 +1,5 @@
-# src/geradorEscalas/ui/login_screen.py
-
 import customtkinter as ctk
+from tkinter import messagebox
 
 class LoginView(ctk.CTkFrame):
     def __init__(self, master, login_callback, register_callback):
@@ -17,8 +16,8 @@ class LoginView(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         
         # --- Widgets ---
-        ctk.CTkLabel(self, text="Acesso ao Sistema", font=ctk.CTkFont(size=28, weight="bold")).grid(row=0, column=0, pady=(0, 10))
-        ctk.CTkLabel(self, text="Utilize suas credenciais para continuar").grid(row=1, column=0, pady=(0, 30))
+        ctk.CTkLabel(self, text="Bem vindo", font=ctk.CTkFont(size=28, weight="bold")).grid(row=0, column=0, pady=(0, 10))
+        ctk.CTkLabel(self, text="Utilize suas credenciais para continuar").grid(row=1, column=0, pady=(0, 40))
         
         ctk.CTkLabel(self, text="Usuário", font=ctk.CTkFont(size=14)).grid(row=2, column=0, sticky="w", padx=20)
         ctk.CTkEntry(self, textvariable=self.user_var, width=300, height=40, placeholder_text="seu.usuario").grid(row=3, column=0, pady=(0, 20), padx=20)
