@@ -2,12 +2,12 @@ import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import bcrypt
 import pandas as pd
-
+from . import fonts
 from .ui.views import (
     LoginWindow, 
     MainWindow, 
     HomeView, 
-    UserRegistrationWindow, 
+    UserRegistrationView, 
     CadastroView, 
     CadastroManualView
 )
@@ -87,10 +87,18 @@ class ApplicationController:
 
     def show_registration(self):
         """Abre a janela de cadastro de usuário sobre a tela de login."""
-        reg_window = UserRegistrationWindow(self.login_window, 
-                                            save_callback=self.on_save_user, 
-                                            back_callback=lambda: reg_window.destroy())
-        reg_window.transient(self.login_window) # Faz a janela de registro aparecer na frente
+        
+        # 1. Cria a JANELA pop-up (Toplevel) que servirá de container
+        reg_window = ctk.CTkToplevel(self.login_window)
+        
+        # 2. Cria a nossa VIEW (o Frame) e a coloca DENTRO da nova janela
+        view = UserRegistrationView(reg_window, 
+                                    save_callback=self.on_save_user, 
+                                    back_callback=reg_window.destroy)
+        view.pack(expand=True, fill="both") 
+
+        # 3. Agora chama os comandos na JANELA (reg_window), que é o objeto correto
+        reg_window.transient(self.login_window) # Faz a janela aparecer na frente da de login
         reg_window.grab_set() # Foco total na janela de registro
 
     def on_save_user(self, data):
@@ -167,4 +175,7 @@ class ApplicationController:
             self.show_login()
 
 if __name__ == "__main__":
+    root = ctk.CTk()
+    root.withdraw() 
+    fonts.init_fonts()
     app = ApplicationController()
