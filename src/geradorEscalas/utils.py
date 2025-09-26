@@ -1,5 +1,3 @@
-# utilitarios.py
-
 from datetime import datetime
 import calendar
 from openpyxl.utils import get_column_letter

@@ -1,24 +1,26 @@
-import tkinter as tk
-from tkinter import ttk
+# src/geradorEscalas/ui/main_menu_screen.py
+
+import customtkinter as ctk
 
 class MainMenuScreen:
     def __init__(self, root, choice_callback):
         self.root = root
-        self.root.title("Menu Principal")
-        self.root.geometry("400x250")
         self.choice_callback = choice_callback
         
-        main_frame = ttk.Frame(self.root, padding="20")
-        main_frame.pack(expand=True, fill="both")
+        main_frame = ctk.CTkFrame(self.root, fg_color="transparent")
+        main_frame.pack(expand=True, fill="both", padx=30, pady=30)
 
-        ttk.Label(main_frame, text="Bem-vindo!", font=("Helvetica", 16, "bold")).pack(pady=10)
-        ttk.Label(main_frame, text="Selecione uma opção para continuar:").pack(pady=5)
+        ctk.CTkLabel(main_frame, text="Menu Principal", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=10)
+        ctk.CTkLabel(main_frame, text="Selecione uma opção para continuar:", font=ctk.CTkFont(size=14)).pack(pady=(0, 20))
         
-        btn_gerar = ttk.Button(main_frame, text="Gerar Escala", 
-                               command=lambda: self.choice_callback("gerar_escala"),
-                               style='Accent.TButton')
-        btn_gerar.pack(fill="x", pady=10, ipady=10)
+        ctk.CTkButton(
+            main_frame, text="Gerar Escala",
+            command=lambda: self.choice_callback("gerar_escala"),
+            height=50, font=ctk.CTkFont(size=14, weight="bold")
+        ).pack(fill="x", pady=10)
                    
-        btn_cadastrar = ttk.Button(main_frame, text="Cadastrar/Importar Colaboradores",
-                                   command=lambda: self.choice_callback("cadastrar_colaborador"))
-        btn_cadastrar.pack(fill="x", pady=10, ipady=10)
+        ctk.CTkButton(
+            main_frame, text="Cadastrar/Importar Colaboradores",
+            command=lambda: self.choice_callback("cadastrar_colaborador"),
+            height=50, font=ctk.CTkFont(size=14, weight="bold")
+        ).pack(fill="x", pady=10)

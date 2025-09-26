@@ -1,41 +1,46 @@
-import tkinter as tk
-from tkinter import ttk
+# src/geradorEscalas/ui/login_screen.py
 
-class LoginScreen:
-    def __init__(self, root, login_callback, register_callback):
-        self.root = root
-        self.root.title("Login - Gerador de Escalas")
-        self.root.geometry("350x250") 
-        self.root.resizable(False, False)
+import customtkinter as ctk
+
+class LoginView(ctk.CTkFrame):
+    def __init__(self, master, login_callback, register_callback):
+        # O 'master' agora é o painel direito da janela principal
+        super().__init__(master, fg_color="transparent")
         
         self.login_callback = login_callback
-        self.register_callback = register_callback 
-        self.user_var = tk.StringVar()
-        self.pass_var = tk.StringVar()
+        self.register_callback = register_callback
+        
+        self.user_var = ctk.StringVar()
+        self.pass_var = ctk.StringVar()
 
-        style = ttk.Style(self.root)
-        style.theme_use('vista')
-        style.configure('Accent.TButton', font=('Helvetica', 10, 'bold'))
-        style.configure('Link.TButton', foreground='blue', padding=0, borderwidth=0)
+        # Configura o grid interno deste frame
+        self.grid_columnconfigure(0, weight=1)
+        
+        # --- Widgets ---
+        ctk.CTkLabel(self, text="Acesso ao Sistema", font=ctk.CTkFont(size=28, weight="bold")).grid(row=0, column=0, pady=(0, 10))
+        ctk.CTkLabel(self, text="Utilize suas credenciais para continuar").grid(row=1, column=0, pady=(0, 30))
+        
+        ctk.CTkLabel(self, text="Usuário", font=ctk.CTkFont(size=14)).grid(row=2, column=0, sticky="w", padx=20)
+        ctk.CTkEntry(self, textvariable=self.user_var, width=300, height=40, placeholder_text="seu.usuario").grid(row=3, column=0, pady=(0, 20), padx=20)
+        
+        ctk.CTkLabel(self, text="Senha", font=ctk.CTkFont(size=14)).grid(row=4, column=0, sticky="w", padx=20)
+        ctk.CTkEntry(self, textvariable=self.pass_var, show="*", width=300, height=40).grid(row=5, column=0, pady=(0, 25), padx=20)
+        
+        ctk.CTkButton(
+            self, text="Entrar", 
+            command=self._try_login, 
+            height=45, font=ctk.CTkFont(size=14, weight="bold")
+        ).grid(row=6, column=0, sticky="ew", padx=20)
+        
+        ctk.CTkButton(
+            self, text="Cadastrar Novo Usuário", 
+            command=self.register_callback, 
+            fg_color="transparent", hover_color="#4A4A4A"
+        ).grid(row=7, column=0, pady=15, sticky="ew", padx=20)
 
-
-        main_frame = ttk.Frame(self.root, padding="20")
-        main_frame.pack(expand=True)
-        
-        ttk.Label(main_frame, text="Usuário:", font=("Helvetica", 10)).pack(anchor="w")
-        ttk.Entry(main_frame, textvariable=self.user_var, width=35).pack(pady=(0, 10))
-        
-        ttk.Label(main_frame, text="Senha:", font=("Helvetica", 10)).pack(anchor="w")
-        ttk.Entry(main_frame, textvariable=self.pass_var, show="*", width=35).pack(pady=(0, 15))
-        
-        ttk.Button(main_frame, text="Entrar", command=self._try_login, style='Accent.TButton').pack(pady=5, fill='x')
-        
-        # NOVO BOTÃO DE CADASTRO
-        ttk.Button(main_frame, text="Cadastrar Novo Usuário", command=self.register_callback).pack(pady=10)
-        
-        self.root.bind('<Return>', self._try_login)
-
-    def _try_login(self, event=None):
-        username = self.user_var.get()
-        password = self.pass_var.get()
-        self.login_callback(username, password)
+    def _try_login(self):
+        # Adiciona uma verificação para não enviar dados vazios
+        if not self.user_var.get() or not self.pass_var.get():
+            messagebox.showwarning("Atenção", "Por favor, preencha usuário e senha.", parent=self)
+            return
+        self.login_callback(self.user_var.get(), self.pass_var.get())

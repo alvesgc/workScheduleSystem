@@ -1,6 +1,7 @@
 
 import mysql.connector
 import bcrypt
+import pandas as pd
 
 DB_CONFIG = {
     'host': "localhost",
@@ -109,4 +110,21 @@ def add_user(username, password, role):
     finally:
         if conexao.is_connected():
             cursor.close()
+            conexao.close()
+            
+def get_active_collaborators_as_dataframe():
+    """Busca todos os colaboradores ativos e retorna como um DataFrame do Pandas."""
+    conexao = get_db_connection()
+    if not conexao:
+        return pd.DataFrame() # Retorna um DataFrame vazio em caso de falha na conexão
+    
+    try:
+        query = "SELECT * FROM colaboradores WHERE ativo = TRUE"
+        df = pd.read_sql(query, conexao)
+        return df
+    except Exception as e:
+        print(f"Erro ao buscar colaboradores: {e}")
+        return pd.DataFrame()
+    finally:
+        if conexao.is_connected():
             conexao.close()

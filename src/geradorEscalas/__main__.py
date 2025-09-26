@@ -1,174 +1,87 @@
-import tkinter as tk
-from tkinter import messagebox, filedialog
-import pandas as pd
-import bcrypt
+# src/geradorEscalas/__main__.py
 
-from .ui import WizardApp, LoginScreen, MainMenuScreen, UserRegistrationScreen
-from . import utils as util
+import customtkinter as ctk
+from tkinter import messagebox
+import bcrypt
+from PIL import Image
+
+# Importações relativas ao pacote
+from .ui.login_screen import LoginView
+# from .ui.main_menu_screen import MainMenuView # Futuras importações
 from . import database as db
 
-# --- FUNÇÕES DE LÓGICA DE NEGÓCIO ---
+# --- DEFINIÇÕES GLOBAIS DO CUSTOMTKINTER ---
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
-def run_escala_wizard(data):
-    # (Sua função run_business_logic completa vai aqui, lendo do banco de dados no futuro)
-    print("Iniciando a lógica para gerar a escala com os dados:", data)
-    return True, "Escala gerada com sucesso (simulação)!"
+class App(ctk.CTk):
+    def __init__(self):
+        super().__init__()
 
-def run_import_colaboradores():
-    filepath = filedialog.askopenfilename(title="Selecione a planilha", filetypes=[("Arquivos Excel", "*.xlsx")])
-    if not filepath: return
-
-    required_columns = ["Nome", "Matrícula", "Cargo", "Setor", "Escala", "Tipo de Turno"]
-    try:
-        df = pd.read_excel(filepath)
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            messagebox.showerror("Erro de Importação", f"Colunas obrigatórias faltando:\n\n- {', '.join(missing_columns)}")
-            return
+        self.title("Gerador de Escalas Profissional")
         
-        sucesso = 0
-        falhas = 0
-        erros_msg = []
+        # --- RESPONSIVIDADE E TELA CHEIA ---
+        # Deixa a janela maximizada ao iniciar
+        self.state('zoomed')
+        # Permite que o usuário redimensione a janela se desejar
+        self.resizable(True, True) 
 
-        # Itera sobre cada linha da planilha e tenta adicionar
-        for index, row in df.iterrows():
-            dados_dict = row.to_dict()
-            is_success, message = db.add_colaborador(dados_dict)
-            if is_success:
-                sucesso += 1
-            else:
-                falhas += 1
-                erros_msg.append(f"Linha {index + 2}: {message}")
+        # --- Layout Principal com Grid ---
+        # Configura o grid para ter duas colunas e uma linha que se expandem
+        self.grid_columnconfigure(0, weight=1) # Painel esquerdo (peso 1)
+        self.grid_columnconfigure(1, weight=2) # Painel direito (peso 2, crescerá mais)
+        self.grid_rowconfigure(0, weight=1)    # A linha única ocupa toda a altura
+
+        # --- Painel Esquerdo (Imagem/Logo) ---
+        self.left_panel = ctk.CTkFrame(self, fg_color="#2B2B2B", corner_radius=0)
+        self.left_panel.grid(row=0, column=0, sticky="nsew")
+        # Configura o grid interno do painel para centralizar a logo
+        self.left_panel.grid_rowconfigure(0, weight=1)
+        self.left_panel.grid_columnconfigure(0, weight=1)
         
-        resultado_final = f"{sucesso} colaboradores importados com sucesso!\n{falhas} falhas."
-        if falhas > 0:
-            resultado_final += "\n\nDetalhes dos erros:\n" + "\n".join(erros_msg)
-        
-        messagebox.showinfo("Importação Concluída", resultado_final)
+        try:
+            logo_image = ctk.CTkImage(Image.open("src/geradorEscalas/logo.png"), size=(300, 300))
+            logo_label = ctk.CTkLabel(self.left_panel, image=logo_image, text="")
+            logo_label.grid(row=0, column=0) # Usa grid para centralizar
+        except Exception as e:
+            print(f"AVISO: logo.png não encontrada. {e}")
 
-    except Exception as e:
-        messagebox.showerror("Erro", f"Ocorreu um erro ao ler ou processar a planilha: {e}")
+        # --- Painel Direito (Conteúdo Dinâmico) ---
+        self.right_panel = ctk.CTkFrame(self, fg_color="#242424", corner_radius=0)
+        self.right_panel.grid(row=0, column=1, sticky="nsew")
+        # Configura o grid do painel direito para centralizar seu conteúdo
+        self.right_panel.grid_rowconfigure(0, weight=1)
+        self.right_panel.grid_columnconfigure(0, weight=1)
 
-def run_save_colaborador(dados):
-    # Chama a função do módulo de banco de dados para salvar
-    success, message = db.add_colaborador(dados)
-    
-    if success:
-        messagebox.showinfo("Sucesso", message)
-    else:
-        messagebox.showerror("Erro ao Salvar", message)
-    
-    return success
+        self.current_view = None
+        self.show_login_view()
 
-# --- CONTROLADOR PRINCIPAL DA APLICAÇÃO ---
-
-# Em src/gerador_escalas/__main__.py, substitua a classe ApplicationController
-
-class ApplicationController:
-    def __init__(self, root):
-        self.root = root
-        self.show_login_screen()
-
-    def _clear_window(self):
-        for widget in self.root.winfo_children():
+    def _clear_right_panel(self):
+        """Limpa todos os widgets do painel de conteúdo direito."""
+        for widget in self.right_panel.winfo_children():
             widget.destroy()
 
-    def show_login_screen(self):
-        self._clear_window()
-        self.root.title("Login")
-        # Passa o novo callback para o registro
-        LoginScreen(self.root, 
-                    login_callback=self.on_login, 
-                    register_callback=self.show_user_registration_screen)
+    def show_login_view(self):
+        self._clear_right_panel()
+        self.current_view = LoginView(self.right_panel, 
+                                      login_callback=self.on_login, 
+                                      register_callback=self.show_user_registration_view)
+        # --- CORREÇÃO: Usa grid para posicionar a view ---
+        # Isso garante que ela fique centralizada no painel direito
+        self.current_view.grid(row=0, column=0, sticky="")
 
     def on_login(self, username, password):
         user = db.get_user_by_username(username)
         if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
-            self.show_main_menu()
+            messagebox.showinfo("Sucesso", f"Login bem-sucedido, {username}!")
+            # self.show_main_menu_view() # Próximo passo
         else:
             messagebox.showerror("Falha no Login", "Usuário ou senha inválidos.")
 
-    def show_main_menu(self):
-        # ... (sem alterações aqui)
-        self._clear_window()
-        self.root.title("Menu Principal")
-        MainMenuScreen(self.root, self.on_main_menu_choice)
-
-    def on_main_menu_choice(self, choice):
-        # ... (sem alterações aqui)
-        if choice == "gerar_escala":
-            self.root.withdraw() 
-            wizard_root = tk.Toplevel(self.root)
-            wizard_root.protocol("WM_DELETE_WINDOW", lambda: self.on_child_window_close(wizard_root))
-            WizardApp(wizard_root, business_logic_callback=run_escala_wizard)
-        elif choice == "cadastrar_colaborador":
-            self.show_cadastro_screen()
-
-    def on_child_window_close(self, window):
-        # ... (sem alterações aqui)
-        window.destroy()
-        self.root.deiconify()
-
-    def show_cadastro_screen(self):
-        # ... (sem alterações aqui)
-        self._clear_window()
-        self.root.title("Gestão de Colaboradores")
-        CadastroScreen(self.root, self.on_cadastro_choice)
-
-    def on_cadastro_choice(self, choice):
-        # ... (sem alterações aqui)
-        if choice == "importar":
-            run_import_colaboradores()
-        elif choice == "manual":
-            self.show_cadastro_manual_screen()
-    
-    def show_cadastro_manual_screen(self):
-        # ... (sem alterações aqui)
-        self._clear_window()
-        self.root.title("Cadastro Manual de Colaborador")
-        CadastroManualScreen(self.root, 
-                             save_callback=self.on_save_colaborador,
-                             back_callback=self.show_main_menu)
-
-    def on_save_colaborador(self, dados):
-        # ... (sem alterações aqui)
-        success = run_save_colaborador(dados)
-        if success:
-            self.show_cadastro_manual_screen()
-
-    # --- NOVAS FUNÇÕES PARA CADASTRO DE USUÁRIO ---
-    def show_user_registration_screen(self):
-        self._clear_window()
-        self.root.title("Cadastro de Usuário")
-        UserRegistrationScreen(self.root,
-                               save_callback=self.on_save_user,
-                               back_callback=self.show_login_screen)
-
-    def on_save_user(self, data):
-        # Validações antes de tentar salvar
-        username = data['username']
-        password = data['password']
-        confirm_password = data['confirm_password']
-        role = data['role']
-
-        if not username or not password:
-            messagebox.showwarning("Campos Vazios", "Usuário e Senha são obrigatórios.", parent=self.root)
-            return
-        
-        if password != confirm_password:
-            messagebox.showerror("Erro de Senha", "As senhas não coincidem.", parent=self.root)
-            return
-
-        # Chama a função do banco de dados para adicionar o usuário
-        success, message = db.add_user(username, password, role)
-        
-        if success:
-            messagebox.showinfo("Sucesso", message, parent=self.root)
-            self.show_login_screen() # Volta para o login após o sucesso
-        else:
-            messagebox.showerror("Erro no Cadastro", message, parent=self.root)
+    def show_user_registration_view(self):
+        messagebox.showinfo("Navegação", "Aqui abriremos a tela de Cadastro de Usuário no painel direito.")
+        # Lógica para mostrar a tela de cadastro...
 
 if __name__ == "__main__":
-    main_root = tk.Tk()
-    app = ApplicationController(main_root)
-    main_root.mainloop()
+    app = App()
+    app.mainloop()
