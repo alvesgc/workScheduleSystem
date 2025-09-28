@@ -83,6 +83,7 @@ class App(ctk.CTk):
         messagebox.showinfo("Importar", "Lógica de importação a ser implementada aqui.")
 
 if __name__ == "__main__":
+    root = ctk.CTk()
     fonts.init_fonts()
+    root.withdraw()
     app = App()
-    app.mainloop()
