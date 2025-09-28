@@ -1,5 +1,3 @@
-# src/gerador_escalas/ui/views/login_view.py
-
 import customtkinter as ctk
 from PIL import Image
 
@@ -10,40 +8,26 @@ class LoginView(ctk.CTkFrame):
         self.login_callback = login_callback
         self.register_callback = register_callback
         
-        # --- Layout Principal com Grid ---
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=2)
-        self.grid_rowconfigure(0, weight=1)
+        # Frame que centraliza todo o conteúdo de login
+        login_container = ctk.CTkFrame(self, fg_color="transparent")
+        login_container.pack(expand=True)
 
-        # --- Painel Esquerdo (Imagem/Logo) ---
-        self.left_panel = ctk.CTkFrame(self, fg_color="#2B2B2B", corner_radius=0)
-        self.left_panel.grid(row=0, column=0, sticky="nsew")
-        self.left_panel.grid_rowconfigure(0, weight=1)
-        self.left_panel.grid_columnconfigure(0, weight=1)
-        
         try:
+            # A logo agora é um elemento DENTRO do painel de login
             logo_image_pil = Image.open("src/gerador_escalas/assets/logoUpa.png")
             logo_image = ctk.CTkImage(logo_image_pil, size=(450, 158))
-            logo_label = ctk.CTkLabel(self.left_panel, image=logo_image, text="")
-            logo_label.grid(row=0, column=0)
+            logo_label = ctk.CTkLabel(login_container, image=logo_image, text="")
+            logo_label.pack(pady=(0, 30))
         except Exception as e:
             print(f"AVISO: logo.png não encontrada. {e}")
+            ctk.CTkLabel(login_container, text="Gerador de Escalas", font=ctk.CTkFont(size=32, weight="bold")).pack(pady=(20, 30))
 
-        # --- Painel Direito (Formulário) ---
-        right_panel = ctk.CTkFrame(self, fg_color="transparent")
-        right_panel.grid(row=0, column=1, sticky="nsew", padx=50)
-        right_panel.grid_rowconfigure(0, weight=1)
-        right_panel.grid_columnconfigure(0, weight=1)
-
-        form_frame = ctk.CTkFrame(right_panel, fg_color="transparent")
-        form_frame.grid(row=0, column=0) # Centraliza o formulário
+        form_frame = ctk.CTkFrame(login_container, fg_color="transparent")
+        form_frame.pack(padx=40, pady=20)
 
         self.user_var = ctk.StringVar()
         self.pass_var = ctk.StringVar()
 
-        ctk.CTkLabel(form_frame, text="Acesso ao Sistema", font=ctk.CTkFont(size=28, weight="bold")).pack(pady=(0, 10))
-        ctk.CTkLabel(form_frame, text="Utilize suas credenciais para continuar").pack(pady=(0, 30))
-        
         ctk.CTkLabel(form_frame, text="Usuário", anchor="w", width=300, font=ctk.CTkFont(size=14)).pack()
         ctk.CTkEntry(form_frame, textvariable=self.user_var, width=300, height=40, placeholder_text="seu.usuario").pack(pady=(0, 20))
         

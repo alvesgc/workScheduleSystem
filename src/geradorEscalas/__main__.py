@@ -2,180 +2,87 @@ import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import bcrypt
 import pandas as pd
-from . import fonts
-from .ui.views import (
-    LoginWindow, 
-    MainWindow, 
-    HomeView, 
-    UserRegistrationView, 
-    CadastroView, 
-    CadastroManualView
-)
+
+# Importa as classes da UI e os módulos de apoio
+from .ui.views import LoginView, MainView, UserRegistrationView
 from . import database as db
-from . import utils as util
+from . import fonts
 
 # --- CONFIGURAÇÕES GLOBAIS ---
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-# --- FUNÇÕES DE LÓGICA DE NEGÓCIO ---
-
-def run_import_colaboradores():
-    """Lida com a importação e validação da planilha de colaboradores."""
-    filepath = filedialog.askopenfilename(
-        title="Selecione a planilha com os colaboradores",
-        filetypes=[("Arquivos Excel", "*.xlsx")]
-    )
-    if not filepath:
-        return
-
-    required_columns = ["Nome", "Matrícula", "Cargo", "Setor", "Escala", "Tipo de Turno"]
-    try:
-        df = pd.read_excel(filepath)
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            messagebox.showerror("Erro de Importação", f"Colunas obrigatórias faltando na planilha:\n\n- {', '.join(missing_columns)}")
-            return
-        
-        sucesso, falhas, erros_msg = 0, 0, []
-        for index, row in df.iterrows():
-            is_success, message = db.add_colaborador(row.to_dict())
-            if is_success:
-                sucesso += 1
-            else:
-                falhas += 1
-                erros_msg.append(f"Linha {index + 2}: {message}")
-        
-        resultado_final = f"{sucesso} colaboradores importados com sucesso!\n{falhas} falhas."
-        if falhas > 0:
-            resultado_final += "\n\nDetalhes dos erros:\n" + "\n".join(erros_msg)
-        
-        messagebox.showinfo("Importação Concluída", resultado_final)
-    except Exception as e:
-        messagebox.showerror("Erro", f"Ocorreu um erro ao ler ou processar a planilha: {e}")
-
-def run_save_colaborador(dados):
-    """Chama a função do módulo de banco de dados para salvar um colaborador."""
-    success, message = db.add_colaborador(dados)
-    # A exibição da mensagem será tratada pelo controlador que chamou a função
-    return success, message
-
-# --- CONTROLADOR PRINCIPAL DA APLICAÇÃO ---
-
-class ApplicationController:
+class App(ctk.CTk):
     def __init__(self):
-        self.login_window = None
-        self.main_window = None
-        self.show_login()
+        super().__init__()
+        self.title("Gerador de Escalas")
+        self.state("zoomed")
+        self.resizable(True, True)
+        self.protocol("WM_DELETE_WINDOW", self.quit)
 
-    def show_login(self):
-        """Exibe a janela de login inicial."""
-        self.login_window = LoginWindow(
-            login_callback=self.on_login,
-            register_callback=self.show_registration
-        )
-        self.login_window.mainloop()
+        self.current_view = None
+        self.show_login_view()
+
+    def _show_view(self, ViewClass, *args, **kwargs):
+        """Limpa a janela e exibe uma nova view principal nela."""
+        if self.current_view:
+            self.current_view.destroy()
+        self.current_view = ViewClass(self, *args, **kwargs)
+        self.current_view.pack(expand=True, fill="both")
+
+    def show_login_view(self):
+        self._show_view(LoginView, 
+                        login_callback=self.on_login, 
+                        register_callback=self.show_registration_view)
 
     def on_login(self, username, password):
-        """Valida as credenciais do usuário e decide o próximo passo."""
         user = db.get_user_by_username(username)
         if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
-            self.login_window.destroy()  # Fecha a janela de login
-            self.show_main_window()      # Abre a janela principal
+            self.show_main_view()
         else:
-            messagebox.showerror("Falha no Login", "Usuário ou senha inválidos.", parent=self.login_window)
+            messagebox.showerror("Falha no Login", "Usuário ou senha inválidos.", parent=self)
 
-    def show_registration(self):
-        """Abre a janela de cadastro de usuário sobre a tela de login."""
-        
-        # 1. Cria a JANELA pop-up (Toplevel) que servirá de container
-        reg_window = ctk.CTkToplevel(self.login_window)
-        
-        # 2. Cria a nossa VIEW (o Frame) e a coloca DENTRO da nova janela
+    def show_main_view(self):
+        self._show_view(MainView, app_controller=self)
+
+    def show_registration_view(self):
+        reg_window = ctk.CTkToplevel(self)
         view = UserRegistrationView(reg_window, 
-                                    save_callback=self.on_save_user, 
+                                    save_callback=lambda data: self.on_save_user(data, reg_window), 
                                     back_callback=reg_window.destroy)
-        view.pack(expand=True, fill="both") 
-
-        # 3. Agora chama os comandos na JANELA (reg_window), que é o objeto correto
-        reg_window.transient(self.login_window) # Faz a janela aparecer na frente da de login
-        reg_window.grab_set() # Foco total na janela de registro
-
-    def on_save_user(self, data):
-        """Valida e salva um novo usuário no banco de dados."""
+        view.pack(expand=True, fill="both")
+        reg_window.transient(self)
+        reg_window.grab_set()
+    
+    def on_save_user(self, data, window_to_close):
         username, password, confirm_password, role = data.values()
         if not username or not password:
-            messagebox.showwarning("Campos Vazios", "Usuário e Senha são obrigatórios.", parent=self.login_window)
+            messagebox.showwarning("Campos Vazios", "Usuário e Senha são obrigatórios.", parent=window_to_close)
             return
         if password != confirm_password:
-            messagebox.showerror("Erro de Senha", "As senhas não coincidem.", parent=self.login_window)
+            messagebox.showerror("Erro de Senha", "As senhas não coincidem.", parent=window_to_close)
             return
-            
         success, message = db.add_user(username, password, role)
         if success:
-            messagebox.showinfo("Sucesso", message, parent=self.login_window)
-            # A janela de registro poderia ser fechada aqui se desejado
+            messagebox.showinfo("Sucesso", message, parent=window_to_close)
+            window_to_close.destroy()
         else:
-            messagebox.showerror("Erro no Cadastro", message, parent=self.login_window)
+            messagebox.showerror("Erro no Cadastro", message, parent=window_to_close)
 
-    def show_main_window(self):
-        """Cria e exibe a janela principal da aplicação com a sidebar."""
-        nav_callbacks = {
-            "home": self.show_home_view,
-            "gerar_escala": self.show_escala_wizard,
-            "colaboradores": self.show_colaboradores_view,
-            "sair": self.logout
-        }
-        self.main_window = MainWindow(nav_callbacks)
-        self.show_home_view() # Exibe a tela Home por padrão
-        self.main_window.mainloop()
-        
-    def show_home_view(self):
-        """Exibe a tela Home na área de conteúdo da janela principal."""
-        self.main_window.show_view(HomeView, 
-                                   gerar_escala_callback=self.show_escala_wizard,
-                                   gerenciar_colaboradores_callback=self.show_colaboradores_view)
-
-    def show_escala_wizard(self):
-        """Inicia o assistente de geração de escala."""
-        messagebox.showinfo("Navegação", "Aqui abriremos o assistente de Gerar Escala.")
-
-    def show_colaboradores_view(self):
-        """Exibe a tela de escolha para gerenciamento de colaboradores."""
-        self.main_window.show_view(CadastroView,
-                                   choice_callback=self.on_cadastro_choice,
-                                   back_callback=self.show_home_view)
-
-    def on_cadastro_choice(self, choice):
-        """Decide qual tela de cadastro mostrar (manual ou importação)."""
-        if choice == "importar":
-            run_import_colaboradores()
-        elif choice == "manual":
-            self.show_cadastro_manual_view()
-
-    def show_cadastro_manual_view(self):
-        """Exibe o formulário de cadastro manual de colaborador."""
-        self.main_window.show_view(CadastroManualView,
-                                   save_callback=self.on_save_colaborador,
-                                   back_callback=self.show_colaboradores_view)
-    
     def on_save_colaborador(self, dados):
-        """Salva um novo colaborador e lida com a resposta."""
-        success, message = run_save_colaborador(dados)
+        success, message = db.add_colaborador(dados)
         if success:
-            messagebox.showinfo("Sucesso", message, parent=self.main_window)
-            self.show_cadastro_manual_view() # Recarrega a tela para adicionar outro
+            messagebox.showinfo("Sucesso", message, parent=self)
+            # Recarrega a view de cadastro para adicionar outro
+            self.current_view.show_cadastro_manual_view()
         else:
-            messagebox.showerror("Erro ao Salvar", message, parent=self.main_window)
-    
-    def logout(self):
-        """Fecha a janela principal e volta para a tela de login."""
-        if messagebox.askyesno("Sair", "Tem certeza que deseja sair do sistema?", parent=self.main_window):
-            self.main_window.destroy()
-            self.show_login()
+            messagebox.showerror("Erro ao Salvar", message, parent=self)
+            
+    def on_import_colaboradores(self):
+        # ... (A lógica de importação pode ser colocada aqui)
+        messagebox.showinfo("Importar", "Lógica de importação a ser implementada aqui.")
 
 if __name__ == "__main__":
-    root = ctk.CTk()
-    root.withdraw() 
     fonts.init_fonts()
-    app = ApplicationController()
+    app = App()
+    app.mainloop()
