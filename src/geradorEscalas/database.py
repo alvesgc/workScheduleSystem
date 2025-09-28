@@ -181,3 +181,31 @@ def get_upcoming_leaves(days_ahead=30):
         except Exception as e:
             print(f"Erro ao buscar próximos afastamentos: {e}")
             return []
+        
+def batch_update_collaborators(matriculas, field_to_update, new_value):
+    """Atualiza um campo específico para uma lista de colaboradores de uma só vez."""
+    if not engine or not matriculas:
+        return False, "Nenhum colaborador selecionado para atualização."
+    
+    # Lista de campos permitidos para evitar injeção de SQL no nome da coluna.
+    # Garante que apenas estas colunas possam ser atualizadas em lote.
+    allowed_fields = ["cargo", "setor", "escala", "tipo_turno", "horario_padrao"]
+    if field_to_update.lower() not in allowed_fields:
+        return False, f"O campo '{field_to_update}' não é permitido para edição em lote."
+        
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            # Construímos a query de forma segura
+            query = text(f"UPDATE colaboradores SET {field_to_update} = :new_value WHERE matricula IN :matriculas_list")
+            
+            result = connection.execute(query, {
+                "new_value": new_value, 
+                "matriculas_list": tuple(matriculas)
+            })
+            
+            trans.commit()
+            return True, f"{result.rowcount} colaborador(es) atualizado(s) com sucesso."
+        except Exception as e:
+            trans.rollback()
+            return False, f"Erro de banco de dados: {e}"

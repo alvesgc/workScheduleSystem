@@ -173,14 +173,20 @@ class App(ctk.CTk):
             messagebox.showerror("Erro", message, parent=self)
 
     def on_batch_update(self, matriculas, field, new_value):
-        """Atualiza um campo em lote e atualiza a tabela."""
+        """
+        Chama o banco de dados para executar a atualização em lote e,
+        se bem-sucedido, atualiza a tabela na tela.
+        """
         success, message = db.batch_update_collaborators(matriculas, field, new_value)
+        
         if success:
             messagebox.showinfo("Sucesso", message, parent=self)
+            # Se a view atual for a MainView, e a sub-view for a de gerenciamento...
             if isinstance(self.current_view, MainView):
-                 self.current_view.show_colaboradores_view()
+                # Pede para a view de gerenciamento recarregar a tabela
+                self.current_view.content_frame.winfo_children()[0].update_table()
         else:
-            messagebox.showerror("Erro", message, parent=self)
+            messagebox.showerror("Erro na Atualização", message, parent=self)
     
     def logout(self):
         self.show_login_view()

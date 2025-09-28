@@ -151,3 +151,21 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
 
     def perform_search(self, event=None):
         self.update_table(self.search_var.get())
+        
+    def apply_batch_edit(self):
+        """Coleta os dados do painel e chama o controlador para aplicar a edição em lote."""
+        matriculas = self.get_selected_matriculas()
+        # Converte o nome do campo para o formato do banco (ex: "Tipo de Turno" -> "tipo_turno")
+        field = self.field_to_edit_var.get().lower().replace(' ', '_')
+        new_value = self.new_value_var.get()
+
+        if not matriculas:
+            messagebox.showwarning("Nenhuma Seleção", "Selecione um ou mais colaboradores para aplicar a alteração.", parent=self)
+            return
+            
+        if not new_value.strip():
+            messagebox.showwarning("Valor Vazio", "Por favor, digite o novo valor a ser aplicado.", parent=self)
+            return
+        
+        # Chama a função no controlador principal para executar a ação
+        self.app_controller.on_batch_update(matriculas, field, new_value)
