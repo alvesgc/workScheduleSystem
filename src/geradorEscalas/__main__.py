@@ -143,10 +143,9 @@ class App(ctk.CTk):
             self.current_view.show_colaboradores_view()
 
     # --- MÉTODO ADICIONADO ---
-    def show_cadastro_manual_view(self):
-        """Instrui a MainView a mostrar o formulário de cadastro manual."""
+    def show_cadastro_manual_view(self, matricula_para_editar=None):
         if isinstance(self.current_view, MainView):
-            self.current_view.show_cadastro_manual_view()
+             self.current_view.show_cadastro_manual_view(matricula_para_editar)
 
     def on_import_colaboradores(self):
         run_import_colaboradores(self)
@@ -171,22 +170,28 @@ class App(ctk.CTk):
                  self.current_view.show_colaboradores_view()
         else:
             messagebox.showerror("Erro", message, parent=self)
+            
+    def show_edicao_lote_view(self, matriculas):
+        """Instrui a MainView a mostrar a tela de edição em lote."""
+        if isinstance(self.current_view, MainView):
+            self.current_view.show_edicao_lote_view(matriculas)
+            
+    def on_batch_update(self, matriculas, changes):
+        """
+        Recebe um dicionário de mudanças e aplica cada uma em lote.
+        Ex: changes = {'setor': 'UTI', 'cargo': 'ENFERMEIRO JR'}
+        """
+        for field, new_value in changes.items():
+            success, message = db.batch_update_collaborators(matriculas, field, new_value)
+            if not success:
+                messagebox.showerror("Erro na Atualização em Lote", message, parent=self)
+                return # Interrompe em caso de erro
 
-    def on_batch_update(self, matriculas, field, new_value):
-        """
-        Chama o banco de dados para executar a atualização em lote e,
-        se bem-sucedido, atualiza a tabela na tela.
-        """
-        success, message = db.batch_update_collaborators(matriculas, field, new_value)
+        messagebox.showinfo("Sucesso", f"{len(matriculas)} colaborador(es) atualizado(s) com sucesso!", parent=self)
         
-        if success:
-            messagebox.showinfo("Sucesso", message, parent=self)
-            # Se a view atual for a MainView, e a sub-view for a de gerenciamento...
-            if isinstance(self.current_view, MainView):
-                # Pede para a view de gerenciamento recarregar a tabela
-                self.current_view.content_frame.winfo_children()[0].update_table()
-        else:
-            messagebox.showerror("Erro na Atualização", message, parent=self)
+        # Volta para a tela de gerenciamento atualizada
+        if isinstance(self.current_view, MainView):
+            self.current_view.show_colaboradores_view()
     
     def logout(self):
         self.show_login_view()

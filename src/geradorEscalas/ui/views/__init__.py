@@ -6,3 +6,4 @@ from .cadastro_view import CadastroView
 from .cadastro_manual_view import CadastroManualView
 from .correcao_view import CorrecaoView
 from .gerenciar_colaboradores_view import GerenciarColaboradoresView
+from .edicao_lote_view import EdicaoEmLoteView 

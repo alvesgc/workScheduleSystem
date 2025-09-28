@@ -7,6 +7,7 @@ from .home_view import HomeView
 from .cadastro_view import CadastroView
 from .cadastro_manual_view import CadastroManualView
 from .gerenciar_colaboradores_view import GerenciarColaboradoresView
+from .edicao_lote_view import EdicaoEmLoteView
 
 class MainView(ctk.CTkFrame):
     def __init__(self, master, app_controller):
@@ -102,17 +103,25 @@ class MainView(ctk.CTkFrame):
 
     def show_colaboradores_view(self):
        self._show_content(GerenciarColaboradoresView, app_controller=self.app_controller)
-                  
+       
+    def show_edicao_lote_view(self, matriculas):
+        self._show_content(EdicaoEmLoteView, app_controller=self.app_controller, matriculas=matriculas)
+        
     def on_cadastro_choice(self, choice):
         if choice == "importar":
             self.app_controller.on_import_colaboradores()
         elif choice == "manual":
             self.show_cadastro_manual_view()
 
-    def show_cadastro_manual_view(self):
+    def show_cadastro_manual_view(self, matricula_para_editar=None):
+        """
+        Mostra a tela de cadastro manual, seja para adicionar um novo
+        ou para editar um colaborador existente.
+        """
         self._show_content(CadastroManualView,
                            save_callback=self.on_save_colaborador,
-                           back_callback=self.show_colaboradores_view)
+                           back_callback=self.show_colaboradores_view,
+                           matricula_para_editar=matricula_para_editar) # Passa a matrícula adiante
                            
     def on_save_colaborador(self, dados):
         self.app_controller.on_save_colaborador(dados)

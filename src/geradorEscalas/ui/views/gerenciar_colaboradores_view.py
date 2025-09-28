@@ -134,12 +134,12 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             messagebox.showwarning("Nenhuma Seleção", "Selecione um ou mais colaboradores para editar.", parent=self)
             return
         
-        # Lógica para decidir qual tela de edição abrir
         if len(matriculas) == 1:
+            # Edição única: abre o formulário de cadastro em modo de edição
             self.app_controller.show_cadastro_manual_view(matricula_para_editar=matriculas[0])
         else: # > 1
-             messagebox.showinfo("Edição em Lote", "A funcionalidade de edição em lote será implementada aqui.", parent=self)
-             # self.app_controller.show_edicao_lote_view(matriculas)
+            # Edição em lote: abre a nova tela de edição em lote
+            self.app_controller.show_edicao_lote_view(matriculas)
 
     def delete_selected(self):
         matriculas = self.get_selected_matriculas()
