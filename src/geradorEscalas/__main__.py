@@ -162,12 +162,23 @@ class App(ctk.CTk):
         else:
             messagebox.showerror("Erro ao Salvar", message, parent=self)
             
-    def on_delete_collaborator(self, matricula):
-        success, message = db.delete_collaborator_by_matricula(matricula)
+    def on_delete_collaborators(self, matriculas):
+        """Deleta múltiplos colaboradores e atualiza a tabela."""
+        success, message = db.delete_collaborators_by_matriculas(matriculas)
         if success:
             messagebox.showinfo("Sucesso", message, parent=self)
-            if isinstance(self.current_view, MainView) and hasattr(self.current_view.content_frame.winfo_children()[0], 'update_table'):
-                 self.current_view.content_frame.winfo_children()[0].update_table()
+            if isinstance(self.current_view, MainView):
+                 self.current_view.show_colaboradores_view()
+        else:
+            messagebox.showerror("Erro", message, parent=self)
+
+    def on_batch_update(self, matriculas, field, new_value):
+        """Atualiza um campo em lote e atualiza a tabela."""
+        success, message = db.batch_update_collaborators(matriculas, field, new_value)
+        if success:
+            messagebox.showinfo("Sucesso", message, parent=self)
+            if isinstance(self.current_view, MainView):
+                 self.current_view.show_colaboradores_view()
         else:
             messagebox.showerror("Erro", message, parent=self)
     

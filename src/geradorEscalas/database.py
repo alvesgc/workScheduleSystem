@@ -73,37 +73,30 @@ def add_colaborador(dados_colaborador):
             return False, f"Erro de banco de dados: {e}"
 
 def get_all_collaborators_dataframe(search_term=None):
-    """
-    Busca os colaboradores, opcionalmente filtrando, e retorna como DataFrame.
-    """
+    """Busca os colaboradores, opcionalmente filtrando, e retorna como DataFrame."""
     if not engine: return pd.DataFrame()
     
-    # Query base
     query = """
         SELECT nome, matricula, cargo, setor, tipo_turno, horario_padrao, coren AS conselho
         FROM colaboradores WHERE ativo = TRUE
     """
-    # Lista de parâmetros para a query
-    params = []
+    # Usaremos um dicionário para os parâmetros, que é mais robusto
+    params = {}
     
     if search_term:
-        query += " AND (nome LIKE %s OR matricula LIKE %s)"
-        # Adiciona o termo de pesquisa (com os curingas '%') duas vezes, uma para cada %s
-        term_with_wildcards = f"%{search_term}%"
-        params = (term_with_wildcards, term_with_wildcards)
+        # SQLAlchemy usa o formato :key para parâmetros nomeados
+        query += " AND (nome LIKE :term OR matricula LIKE :term)"
+        params['term'] = f"%{search_term}%"
 
     query += " ORDER BY nome"
     
     try:
-        # Passa a tupla de parâmetros para o pandas
+        # Passa o dicionário de parâmetros para o pandas
         df = pd.read_sql(query, engine, params=params)
         return df
     except Exception as e:
         print(f"Erro ao executar a pesquisa no banco de dados: {e}")
         return pd.DataFrame()
-    
-    # df = pd.read_sql(query, engine, params=params if params else None)
-    # return df
 
 def delete_collaborator_by_matricula(matricula):
     """Deleta um colaborador do banco de dados pela matrícula."""
@@ -121,7 +114,28 @@ def delete_collaborator_by_matricula(matricula):
         except Exception as e:
             trans.rollback()
             return False, f"Erro de banco de dados: {e}"
-
+        
+def update_collaborator(matricula, data):
+    """Atualiza os dados de um colaborador existente."""
+    if not engine: return False, "Motor de conexão não está disponível."
+    
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            # Constrói a query de atualização dinamicamente
+            set_clause = ", ".join([f"{key} = :{key}" for key in data.keys()])
+            query_str = f"UPDATE colaboradores SET {set_clause} WHERE matricula = :original_matricula"
+            
+            params = data
+            params['original_matricula'] = matricula
+            
+            connection.execute(text(query_str), params)
+            trans.commit()
+            return True, "Colaborador atualizado com sucesso."
+        except Exception as e:
+            trans.rollback()
+            return False, f"Erro de banco de dados: {e}"
+        
 def get_dashboard_stats():
     """Busca estatísticas rápidas para o dashboard usando SQLAlchemy."""
     stats = {'total_colaboradores': 0, 'total_setores': 0}
