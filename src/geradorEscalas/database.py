@@ -1,151 +1,169 @@
 import mysql.connector
 import bcrypt
 import pandas as pd
-
 from datetime import datetime, timedelta
+from sqlalchemy import create_engine, text
 
+# --- CONFIGURAÇÕES DE BANCO DE DADOS (CORRIGIDO) ---
 DB_CONFIG = {
     'host': "localhost",
     'user': "root",
-    'password': "1234", # <<< MUDE AQUI
+    'password': "1234", # <<< MUDE AQUI SE NECESSÁRIO
+    'port': "3306",
     'database': "gerador_escala_db"
 }
 
-def get_db_connection():
-    try:
-        return mysql.connector.connect(**DB_CONFIG)
-    except mysql.connector.Error as err:
-        print(f"Erro de conexão com o BD: {err}")
-        return None
+try:
+    # 2. STRING DE CONEXÃO CORRIGIDA PARA USAR AS VARIÁVEIS CERTAS
+    connection_string = (
+        f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}"
+        f"@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
+    )
+    engine = create_engine(connection_string)
+except Exception as e:
+    engine = None
+    print(f"ERRO CRÍTICO: Falha ao criar o motor de conexão com SQLAlchemy: {e}")
 
 def get_user_by_username(username):
-    conexao = get_db_connection()
-    if not conexao: return None
-    try:
-        cursor = conexao.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM usuarios WHERE username = %s", (username,))
-        return cursor.fetchone()
-    finally:
-        if conexao.is_connected(): conexao.close()
+    """Busca um usuário pelo nome de usuário e retorna seus dados."""
+    if not engine: return None
+    
+    with engine.connect() as connection:
+        query = text("SELECT * FROM usuarios WHERE username = :user")
+        result = connection.execute(query, {"user": username}).fetchone()
+        return result._asdict() if result else None
 
 def add_user(username, password, role):
-    conexao = get_db_connection()
-    if not conexao: return False, "Não foi possível conectar ao banco de dados."
-    try:
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-        cursor = conexao.cursor()
-        sql = "INSERT INTO usuarios (username, password_hash, role) VALUES (%s, %s, %s)"
-        valores = (username, hashed_password.decode('utf-8'), role)
-        cursor.execute(sql, valores)
-        conexao.commit()
-        return True, f"Usuário '{username}' criado com sucesso!"
-    except mysql.connector.Error as err:
-        if err.errno == 1062: return False, f"Erro: O nome de usuário '{username}' já existe."
-        return False, f"Erro de banco de dados: {err}"
-    finally:
-        if conexao.is_connected(): conexao.close()
+    """Adiciona um novo usuário ao banco de dados com senha criptografada."""
+    if not engine: return False, "Motor de conexão com o banco de dados não está disponível."
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            query = text("INSERT INTO usuarios (username, password_hash, role) VALUES (:user, :pwd_hash, :role)")
+            connection.execute(query, {"user": username, "pwd_hash": hashed_password.decode('utf-8'), "role": role})
+            trans.commit()
+            return True, f"Usuário '{username}' criado com sucesso!"
+        except Exception as e:
+            trans.rollback()
+            if "Duplicate entry" in str(e):
+                return False, f"Erro: O nome de usuário '{username}' já existe."
+            return False, f"Erro de banco de dados: {e}"
 
 def add_colaborador(dados_colaborador):
-    conexao = get_db_connection()
-    if not conexao: return False, "Não foi possível conectar ao banco de dados."
-    try:
-        cursor = conexao.cursor()
-        sql = """
-            INSERT INTO colaboradores 
-            (nome, matricula, cargo, setor, escala, tipo_turno, horario_padrao, coren, ativo) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        valores = (
-            dados_colaborador.get("Nome"), dados_colaborador.get("Matrícula"),
-            dados_colaborador.get("Cargo"), dados_colaborador.get("Setor"),
-            dados_colaborador.get("Escala"), dados_colaborador.get("Tipo de Turno"),
-            dados_colaborador.get("Horário Padrão"), dados_colaborador.get("COREN (opcional)"),
-            True
-        )
-        cursor.execute(sql, valores)
-        conexao.commit()
-        return True, f"Colaborador '{dados_colaborador.get('Nome')}' cadastrado com sucesso!"
-    except mysql.connector.Error as err:
-        if err.errno == 1062: return False, f"Erro: A matrícula '{dados_colaborador.get('Matrícula')}' já existe."
-        return False, f"Erro de banco de dados: {err}"
-    finally:
-        if conexao.is_connected(): conexao.close()
+    """Adiciona um novo colaborador ao banco de dados."""
+    if not engine: return False, "Motor de conexão com o banco de dados não está disponível."
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            sql = text("""
+                INSERT INTO colaboradores 
+                (nome, matricula, cargo, setor, escala, tipo_turno, horario_padrao, coren, ativo) 
+                VALUES (:nome, :matricula, :cargo, :setor, :escala, :tipo_turno, :horario_padrao, :coren, :ativo)
+            """)
+            params = { "nome": dados_colaborador.get("Nome"), "matricula": dados_colaborador.get("Matrícula"), "cargo": dados_colaborador.get("Cargo"), "setor": dados_colaborador.get("Setor"), "escala": dados_colaborador.get("Escala"), "tipo_turno": dados_colaborador.get("Tipo de Turno"), "horario_padrao": dados_colaborador.get("Horário Padrão"), "coren": dados_colaborador.get("COREN (opcional)"), "ativo": True }
+            connection.execute(sql, params)
+            trans.commit()
+            return True, f"Colaborador '{dados_colaborador.get('Nome')}' cadastrado com sucesso!"
+        except Exception as e:
+            trans.rollback()
+            if "Duplicate entry" in str(e):
+                return False, f"Erro: A matrícula '{dados_colaborador.get('Matrícula')}' já existe."
+            return False, f"Erro de banco de dados: {e}"
 
-def get_active_collaborators_as_dataframe():
-    conexao = get_db_connection()
-    if not conexao: return pd.DataFrame()
-    try:
-        query = "SELECT * FROM colaboradores WHERE ativo = TRUE"
-        return pd.read_sql(query, conexao)
-    except Exception as e:
-        print(f"Erro ao buscar colaboradores: {e}")
-        return pd.DataFrame()
-    finally:
-        if conexao.is_connected(): conexao.close()
+def get_all_collaborators_dataframe(search_term=None):
+    """
+    Busca os colaboradores, opcionalmente filtrando, e retorna como DataFrame.
+    """
+    if not engine: return pd.DataFrame()
+    
+    # Query base
+    query = """
+        SELECT nome, matricula, cargo, setor, tipo_turno, horario_padrao, coren AS conselho
+        FROM colaboradores WHERE ativo = TRUE
+    """
+    # Lista de parâmetros para a query
+    params = []
+    
+    if search_term:
+        query += " AND (nome LIKE %s OR matricula LIKE %s)"
+        # Adiciona o termo de pesquisa (com os curingas '%') duas vezes, uma para cada %s
+        term_with_wildcards = f"%{search_term}%"
+        params = (term_with_wildcards, term_with_wildcards)
 
-def get_dashboard_stats():
-    """Busca estatísticas rápidas para o dashboard."""
-    stats = {'total_colaboradores': 0, 'total_setores': 0}
-    conexao = get_db_connection()
-    if not conexao: return stats
+    query += " ORDER BY nome"
     
     try:
-        cursor = conexao.cursor()
-        # Conta colaboradores ativos
-        cursor.execute("SELECT COUNT(id) FROM colaboradores WHERE ativo = TRUE")
-        stats['total_colaboradores'] = cursor.fetchone()[0]
-        # Conta setores distintos
-        cursor.execute("SELECT COUNT(DISTINCT setor) FROM colaboradores WHERE ativo = TRUE")
-        stats['total_setores'] = cursor.fetchone()[0]
-        return stats
-    finally:
-        if conexao.is_connected(): conexao.close()
-
-def get_upcoming_leaves(days_ahead=30):
-    """Busca afastamentos (férias, etc.) que começarão nos próximos X dias."""
-    leaves = []
-    conexao = get_db_connection()
-    if not conexao: return leaves
-    
-    try:
-        cursor = conexao.cursor(dictionary=True)
-        # Busca por colaboradores com período de afastamento preenchido
-        query = "SELECT nome, periodo_afastamento FROM colaboradores WHERE periodo_afastamento IS NOT NULL AND periodo_afastamento != '' AND ativo = TRUE"
-        cursor.execute(query)
-        
-        today = datetime.now()
-        limit_date = today + timedelta(days=days_ahead)
-        
-        for row in cursor.fetchall():
-            try:
-                # Extrai a data de início do texto "dd/mm/aaaa a dd/mm/aaaa"
-                start_date_str = row['periodo_afastamento'].split(' a ')[0]
-                start_date = datetime.strptime(start_date_str, '%d/%m/%Y')
-                # Verifica se a data de início está no nosso intervalo de tempo
-                if today <= start_date <= limit_date:
-                    leaves.append({'nome': row['nome'], 'data_inicio': start_date.strftime('%d/%m/%Y')})
-            except (ValueError, IndexError):
-                # Ignora formatos de data inválidos
-                continue
-        # Ordena pela data de início
-        return sorted(leaves, key=lambda x: datetime.strptime(x['data_inicio'], '%d/%m/%Y'))
-
-    finally:
-        if conexao.is_connected(): conexao.close()
-        
-def get_all_collaborators_dataframe():
-    """Busca TODOS os colaboradores (ativos e inativos) e retorna como DataFrame."""
-    conexao = get_db_connection()
-    if not conexao:
-        return pd.DataFrame()
-    
-    try:
-        # Selecionamos colunas específicas na ordem que queremos exibir
-        query = "SELECT nome, matricula, cargo, setor, escala, tipo_turno, horario_padrao FROM colaboradores ORDER BY nome"
-        df = pd.read_sql(query, conexao)
+        # Passa a tupla de parâmetros para o pandas
+        df = pd.read_sql(query, engine, params=params)
         return df
     except Exception as e:
-        print(f"Erro ao buscar todos os colaboradores: {e}")
+        print(f"Erro ao executar a pesquisa no banco de dados: {e}")
         return pd.DataFrame()
-    finally:
-        if conexao.is_connected(): conexao.close()
+    
+    # df = pd.read_sql(query, engine, params=params if params else None)
+    # return df
+
+def delete_collaborator_by_matricula(matricula):
+    """Deleta um colaborador do banco de dados pela matrícula."""
+    if not engine: return False, "Motor de conexão com o banco de dados não está disponível."
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            query = text("DELETE FROM colaboradores WHERE matricula = :matricula")
+            result = connection.execute(query, {"matricula": matricula})
+            trans.commit()
+            if result.rowcount > 0:
+                return True, "Colaborador excluído com sucesso."
+            else:
+                return False, "Nenhum colaborador encontrado com a matrícula fornecida."
+        except Exception as e:
+            trans.rollback()
+            return False, f"Erro de banco de dados: {e}"
+
+def get_dashboard_stats():
+    """Busca estatísticas rápidas para o dashboard usando SQLAlchemy."""
+    stats = {'total_colaboradores': 0, 'total_setores': 0}
+    if not engine: return stats
+    
+    with engine.connect() as connection:
+        try:
+            query_colab = text("SELECT COUNT(id) FROM colaboradores WHERE ativo = TRUE")
+            stats['total_colaboradores'] = connection.execute(query_colab).scalar_one_or_none() or 0
+            
+            query_setor = text("SELECT COUNT(DISTINCT setor) FROM colaboradores WHERE ativo = TRUE")
+            stats['total_setores'] = connection.execute(query_setor).scalar_one_or_none() or 0
+            
+            return stats
+        except Exception as e:
+            print(f"Erro ao buscar estatísticas do dashboard: {e}")
+            return {'total_colaboradores': 0, 'total_setores': 0}
+
+def get_upcoming_leaves(days_ahead=30):
+    """Busca afastamentos que começarão nos próximos X dias usando SQLAlchemy."""
+    leaves = []
+    if not engine: return leaves
+    
+    with engine.connect() as connection:
+        try:
+            query = text("SELECT nome, periodo_afastamento FROM colaboradores WHERE periodo_afastamento IS NOT NULL AND periodo_afastamento != '' AND ativo = TRUE")
+            result = connection.execute(query)
+            
+            today = datetime.now()
+            limit_date = today + timedelta(days=days_ahead)
+            
+            for row in result:
+                row_dict = row._asdict()
+                try:
+                    start_date_str = row_dict['periodo_afastamento'].split(' a ')[0]
+                    start_date = datetime.strptime(start_date_str, '%d/%m/%Y')
+                    if today <= start_date <= limit_date:
+                        leaves.append({'nome': row_dict['nome'], 'data_inicio': start_date.strftime('%d/%m/%Y')})
+                except (ValueError, IndexError):
+                    continue
+            
+            return sorted(leaves, key=lambda x: datetime.strptime(x['data_inicio'], '%d/%m/%Y'))
+        except Exception as e:
+            print(f"Erro ao buscar próximos afastamentos: {e}")
+            return []
