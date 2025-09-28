@@ -80,6 +80,7 @@ class App(ctk.CTk):
         messagebox.showinfo("Navegação", "Aqui abriremos o assistente de Gerar Escala.")
 
     def show_colaboradores_view(self):
+        """Exibe a nova tela de gerenciamento de colaboradores."""
         if isinstance(self.current_view, MainView):
             self.current_view.show_colaboradores_view()
 
@@ -133,7 +134,7 @@ class App(ctk.CTk):
         except Exception as e:
             messagebox.showerror("Erro", f"Ocorreu um erro ao processar a planilha: {e}", parent=self)
         
-    def on_save_colaborador(self, dados):
+    def on_save_colaborafdor(self, dados):
         success, message = db.add_colaborador(dados)
         if success:
             messagebox.showinfo("Sucesso", message, parent=self)

@@ -6,6 +6,7 @@ from tkinter import messagebox
 from .home_view import HomeView
 from .cadastro_view import CadastroView
 from .cadastro_manual_view import CadastroManualView
+from .gerenciar_colaboradores_view import GerenciarColaboradoresView
 
 class MainView(ctk.CTkFrame):
     def __init__(self, master, app_controller):
@@ -100,10 +101,8 @@ class MainView(ctk.CTkFrame):
         messagebox.showinfo("Navegação", "Aqui abriremos o assistente de Gerar Escala.")
 
     def show_colaboradores_view(self):
-        self._show_content(CadastroView,
-                           choice_callback=self.on_cadastro_choice,
-                           back_callback=self.show_home_view)
-                           
+       self._show_content(GerenciarColaboradoresView, app_controller=self.app_controller)
+                  
     def on_cadastro_choice(self, choice):
         if choice == "importar":
             self.app_controller.on_import_colaboradores()
@@ -117,6 +116,7 @@ class MainView(ctk.CTkFrame):
                            
     def on_save_colaborador(self, dados):
         self.app_controller.on_save_colaborador(dados)
+    
 
     def logout(self):
         if messagebox.askyesno("Sair", "Tem certeza que deseja sair?", parent=self):
