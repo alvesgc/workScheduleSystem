@@ -1,4 +1,4 @@
-# src/gerador_escalas/ui/views/__init__.py
+# src/geradorEscalas/ui/views/__init__.py
 
 from .login_view import LoginView
 from .main_window_view import MainView

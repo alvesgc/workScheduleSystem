@@ -1,8 +1,8 @@
-# src/gerador_escalas/database.py
-
 import mysql.connector
 import bcrypt
 import pandas as pd
+
+from datetime import datetime, timedelta
 
 DB_CONFIG = {
     'host': "localhost",
@@ -82,3 +82,48 @@ def get_active_collaborators_as_dataframe():
         return pd.DataFrame()
     finally:
         if conexao.is_connected(): conexao.close()
+
+def get_dashboard_stats():
+    """Busca estatísticas rápidas para o dashboard."""
+    stats = {'total_colaboradores': 0, 'total_setores': 0}
+    conexao = get_db_connection()
+    if not conexao: return stats
+    
+    try:
+        cursor = conexao.cursor()
+        # Conta colaboradores ativos
+        cursor.execute("SELECT COUNT(id) FROM colaboradores WHERE ativo = TRUE")
+        stats['total_colaboradores'] = cursor.fetchone()[0]
+        # Conta setores distintos
+        cursor.execute("SELECT COUNT(DISTINCT setor) FROM colaboradores WHERE ativo = TRUE")
+        stats['total_setores'] = cursor.fetchone()[0]
+        return stats
+    finally:
+        if conexao.is_connected(): conexao.close()
+def get_upcoming_leaves(days_ahead=30):
+    leaves = []
+    conexao = get_db_connection()
+    if not conexao: return leaves
+    try: 
+        cursor = conexao.cursor(directonary=True)
+        query = "SELECT nome, periodo_afastamento FROM colaboradores WHERE periodo_afastamento IS NOT NULL AND periodo_afastamento != '' AND ativo = TRUE"
+        cursor.execute(query)
+        
+        today = datetime.now()
+        limit_date = today + timedelta(days=days_ahead)
+        
+        for row in cursor.fetchall(): 
+            try:
+                # Extrai a data de início do texto "dd/mm/aaaa a dd/mm/aaaa"
+                start_date_str = row['periodo_afastamento'].split('a')[0].strip()
+                start_date = datetime.striptime(start_date_str, "%d/%m/%Y")
+                # Verifica se a data de início está no nosso intervalo de tempo
+                if today <= start_date <= limit_date:
+                    leaves.append({'nome': row['nome'], 'data_inicio': start_date.strftime('%d/%m/%Y')})
+            except (ValueError, IndexError):
+                # Ignora formatos de data inválidos
+                continue
+        return sorted(leaves, key=lambda x: datetime.strptime(x['data_inicio'], '%d/%m/%Y'))
+    finally:
+        if conexao.is_connected(): conexao.close()
+                

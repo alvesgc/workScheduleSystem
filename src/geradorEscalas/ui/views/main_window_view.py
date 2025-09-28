@@ -1,3 +1,5 @@
+# src/gerador_escalas/ui/views/main_window_view.py
+
 import customtkinter as ctk
 import tkfontawesome as fa
 from tkinter import messagebox
@@ -12,14 +14,18 @@ class MainView(ctk.CTkFrame):
         super().__init__(master, fg_color="#242424")
         self.app_controller = app_controller
 
+        self.sidebar_expanded = True
+
         # --- Layout Principal ---
-        self.grid_columnconfigure(1, weight=1)
+        # A MainView agora controla seu próprio grid interno
+        self.grid_columnconfigure(0, minsize=250) # Define o tamanho inicial da sidebar
+        self.grid_columnconfigure(1, weight=1)   # A área de conteúdo ocupa o resto
         self.grid_rowconfigure(0, weight=1)
 
         # --- Sidebar ---
-        self.sidebar_frame = ctk.CTkFrame(self, width=250, corner_radius=0)
+        self.sidebar_frame = ctk.CTkFrame(self, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(4, weight=1)
+        self.sidebar_frame.grid_rowconfigure(5, weight=1)
         
         icon_color = "white"
         icon_size = 22
@@ -27,27 +33,65 @@ class MainView(ctk.CTkFrame):
         self.icon_calendar = fa.icon_to_image("calendar-alt", fill=icon_color, scale_to_height=icon_size)
         self.icon_users = fa.icon_to_image("users", fill=icon_color, scale_to_height=icon_size)
         self.icon_logout = fa.icon_to_image("sign-out-alt", fill=icon_color, scale_to_height=icon_size)
+        self.icon_menu = fa.icon_to_image("bars", fill=icon_color, scale_to_height=icon_size)
+        self.icon_close = fa.icon_to_image("times", fill=icon_color, scale_to_height=icon_size)
+        
+        self.hamburger_button = ctk.CTkButton(self.sidebar_frame, text="", image=self.icon_menu, width=40,
+                                              command=self.toggle_sidebar, fg_color="transparent", hover_color="#4A4A4A")
+        self.hamburger_button.grid(row=0, column=0, padx=20, pady=20, sticky="w")
+        
+        self.home_button = ctk.CTkButton(self.sidebar_frame, text="Início", image=self.icon_home, compound="left", anchor="w", command=self.show_home_view)
+        self.home_button.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        
+        self.escala_button = ctk.CTkButton(self.sidebar_frame, text="Gerar Escala", image=self.icon_calendar, compound="left", anchor="w", command=self.show_escala_wizard)
+        self.escala_button.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+        
+        self.colab_button = ctk.CTkButton(self.sidebar_frame, text="Colaboradores", image=self.icon_users, compound="left", anchor="w", command=self.show_colaboradores_view)
+        self.colab_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
 
-        ctk.CTkLabel(self.sidebar_frame, text="Navegação", font=ctk.CTkFont(size=20, weight="bold")).grid(row=0, column=0, padx=20, pady=20)
-        ctk.CTkButton(self.sidebar_frame, text="Início", image=self.icon_home, compound="left", anchor="w", command=self.show_home_view).grid(row=1, column=0, padx=20, pady=10, sticky="ew")
-        ctk.CTkButton(self.sidebar_frame, text="Gerar Escala", image=self.icon_calendar, compound="left", anchor="w", command=self.show_escala_wizard).grid(row=2, column=0, padx=20, pady=10, sticky="ew")
-        ctk.CTkButton(self.sidebar_frame, text="Colaboradores", image=self.icon_users, compound="left", anchor="w", command=self.show_colaboradores_view).grid(row=3, column=0, padx=20, pady=10, sticky="ew")
-        ctk.CTkButton(self.sidebar_frame, text="Sair", image=self.icon_logout, compound="left", anchor="w", command=self.logout, fg_color="#C43E3E", hover_color="#A03030").grid(row=5, column=0, padx=20, pady=20, sticky="s")
+        self.logout_button = ctk.CTkButton(self.sidebar_frame, text="Sair", image=self.icon_logout, compound="left", anchor="w", command=self.logout, fg_color="#C43E3E", hover_color="#A03030")
+        self.logout_button.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
         # --- Área de Conteúdo ---
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.content_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
-    
-        self.show_home_view()
         
+        self.show_home_view()
+
+    def toggle_sidebar(self):
+        """Expande ou recolhe a barra lateral, alterando a configuração do grid da MainView."""
+        self.sidebar_expanded = not self.sidebar_expanded
+        
+        if self.sidebar_expanded:
+            # CORREÇÃO: Comanda o grid da própria MainView (self)
+            self.grid_columnconfigure(0, minsize=250)
+            self.home_button.configure(text="Início", anchor="w")
+            self.escala_button.configure(text="Gerar Escala", anchor="w")
+            self.colab_button.configure(text="Colaboradores", anchor="w")
+            self.logout_button.configure(text="Sair", anchor="w")
+            self.hamburger_button.configure(image=self.icon_close)
+        else:
+            # CORREÇÃO: Comanda o grid da própria MainView (self)
+            self.grid_columnconfigure(0, minsize=70)
+            self.home_button.configure(text="", anchor="center")
+            self.escala_button.configure(text="", anchor="center")
+            self.colab_button.configure(text="", anchor="center")
+            self.logout_button.configure(text="", anchor="center")
+            self.hamburger_button.configure(image=self.icon_menu)
+            
+    # --- Métodos de Navegação Interna ---
     def _clear_content_frame(self):
         for widget in self.content_frame.winfo_children():
             widget.destroy()
 
     def _show_content(self, ViewClass, *args, **kwargs):
         self._clear_content_frame()
+        # Garante que o content_frame tenha um grid configurado para centralizar
+        self.content_frame.grid_columnconfigure(0, weight=1)
+        self.content_frame.grid_rowconfigure(0, weight=1)
+        
         view = ViewClass(self.content_frame, *args, **kwargs)
-        view.pack(expand=True, fill="both")
+        view.grid(row=0, column=0, sticky="nsew")
 
     def show_home_view(self):
         self._show_content(HomeView, 

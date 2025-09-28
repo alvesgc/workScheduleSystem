@@ -1,5 +1,3 @@
-# src/gerador_escalas/fonts.py
-
 import customtkinter as ctk
 import os
 
@@ -36,6 +34,6 @@ def init_fonts():
 
     except Exception as e:
         print(f"ERRO: Não foi possível carregar as fontes Poppins: {e}")
-        print("Verifique se os arquivos .ttf estão na pasta 'src/gerador_escalas/assets/fonts/'.")
+        print("Verifique se os arquivos .ttf estão na pasta 'src/geradorEscalas/assets/fonts/'.")
         print("Usando fontes padrão do sistema.")
         return False

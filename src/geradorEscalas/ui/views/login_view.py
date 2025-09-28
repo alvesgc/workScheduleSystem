@@ -14,7 +14,7 @@ class LoginView(ctk.CTkFrame):
 
         try:
             # A logo agora é um elemento DENTRO do painel de login
-            logo_image_pil = Image.open("src/gerador_escalas/assets/logoUpa.png")
+            logo_image_pil = Image.open("src/geradorEscalas/assets/logoUpa.png")
             logo_image = ctk.CTkImage(logo_image_pil, size=(450, 158))
             logo_label = ctk.CTkLabel(login_container, image=logo_image, text="")
             logo_label.pack(pady=(0, 30))

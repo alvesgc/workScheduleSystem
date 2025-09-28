@@ -1,4 +1,4 @@
-# src/gerador_escalas/ui/views/main_window_view.py
+# src/geradorEscalas/ui/views/main_window_view.py
 
 import customtkinter as ctk
 import tkfontawesome as fa
