@@ -132,3 +132,20 @@ def get_upcoming_leaves(days_ahead=30):
 
     finally:
         if conexao.is_connected(): conexao.close()
+        
+def get_all_collaborators_dataframe():
+    """Busca TODOS os colaboradores (ativos e inativos) e retorna como DataFrame."""
+    conexao = get_db_connection()
+    if not conexao:
+        return pd.DataFrame()
+    
+    try:
+        # Selecionamos colunas específicas na ordem que queremos exibir
+        query = "SELECT nome, matricula, cargo, setor, escala, tipo_turno, horario_padrao FROM colaboradores ORDER BY nome"
+        df = pd.read_sql(query, conexao)
+        return df
+    except Exception as e:
+        print(f"Erro ao buscar todos os colaboradores: {e}")
+        return pd.DataFrame()
+    finally:
+        if conexao.is_connected(): conexao.close()

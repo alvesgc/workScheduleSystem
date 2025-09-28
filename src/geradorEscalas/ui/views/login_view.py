@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from PIL import Image
+import os
 
 class LoginView(ctk.CTkFrame):
     def __init__(self, master, login_callback, register_callback):
@@ -13,11 +14,10 @@ class LoginView(ctk.CTkFrame):
         login_container.pack(expand=True)
 
         try:
-            # A logo agora é um elemento DENTRO do painel de login
-            logo_image_pil = Image.open("src/geradorEscalas/assets/logoUpa.png")
-            logo_image = ctk.CTkImage(logo_image_pil, size=(450, 158))
-            logo_label = ctk.CTkLabel(login_container, image=logo_image, text="")
-            logo_label.pack(pady=(0, 30))
+          logo_image_pil = Image.open("src/geradorEscalas/assets/logoUpa.png")
+          logo_image = ctk.CTkImage(logo_image_pil, size=(450, 158))
+          logo_label = ctk.CTkLabel(login_container, image=logo_image, text="")
+          logo_label.pack(pady=(0, 30))
         except Exception as e:
             print(f"AVISO: logo.png não encontrada. {e}")
             ctk.CTkLabel(login_container, text="Gerador de Escalas", font=ctk.CTkFont(size=32, weight="bold")).pack(pady=(20, 30))

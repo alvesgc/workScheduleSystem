@@ -9,7 +9,7 @@ DB_USER = "root"
 DB_PASSWORD = "1234"
 DB_HOST = "localhost"
 DB_PORT = "3306"
-DB_NAME = "gerador_escala_db"
+DB_NAME = "geradorEscalas_db"
 EXCEL_FILE_PATH = r"C:\Users\Alissongc\Downloads\Teste\ESCALABANCODEDADOS.xlsx"
 
 print("--- INICIANDO SCRIPT DE MIGRAÇÃO ---")
