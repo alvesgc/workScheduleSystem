@@ -127,6 +127,22 @@ class App(ctk.CTk):
         else:
             messagebox.showerror("Erro ao Salvar", message, parent=self)
 
+    def on_save_user(self, data, window_to_close):
+        """Valida e salva um novo usuário."""
+        username, password, confirm_password, role = data.values()
+        if not username or not password:
+            messagebox.showwarning("Campos Vazios", "Usuário e Senha são obrigatórios.", parent=window_to_close)
+            return
+        if password != confirm_password:
+            messagebox.showerror("Erro de Senha", "As senhas não coincidem.", parent=window_to_close)
+            return
+        success, message = db.add_user(username, password, role)
+        if success:
+            messagebox.showinfo("Sucesso", message, parent=window_to_close)
+            window_to_close.destroy()
+        else:
+            messagebox.showerror("Erro no Cadastro", message, parent=window_to_close)
+            
     # --- Métodos de Navegação chamados pela MainView ---
     def show_home_view(self):
         if isinstance(self.current_view, MainView):
