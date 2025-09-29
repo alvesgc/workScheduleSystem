@@ -97,7 +97,14 @@ def get_all_collaborators_dataframe(search_term=None):
     except Exception as e:
         print(f"Erro ao executar a pesquisa no banco de dados: {e}")
         return pd.DataFrame()
-
+def get_collaborator_by_matricula(matricula):
+    """Busca os dados de um colaborador específico pela matrícula."""
+    if not engine: return None
+    with engine.connect() as connection:
+        query = text("SELECT * FROM colaboradores WHERE matricula = :matricula")
+        result = connection.execute(query, {"matricula": matricula}).fetchone()
+        return result._asdict() if result else None
+    
 def delete_collaborator_by_matricula(matricula):
     """Deleta um colaborador do banco de dados pela matrícula."""
     if not engine: return False, "Motor de conexão com o banco de dados não está disponível."

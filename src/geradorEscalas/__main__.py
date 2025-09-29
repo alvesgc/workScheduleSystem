@@ -1,5 +1,3 @@
-# src/geradorEscalas/__main__.py
-
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import bcrypt
@@ -114,20 +112,20 @@ class App(ctk.CTk):
         reg_window.transient(self)
         reg_window.grab_set()
     
-    def on_save_user(self, data, window_to_close):
-        username, password, confirm_password, role = data.values()
-        if not username or not password:
-            messagebox.showwarning("Campos Vazios", "Usuário e Senha são obrigatórios.", parent=window_to_close)
-            return
-        if password != confirm_password:
-            messagebox.showerror("Erro de Senha", "As senhas não coincidem.", parent=window_to_close)
-            return
-        success, message = db.add_user(username, password, role)
+    def on_save_colaborador(self, dados, matricula_original=None):
+        if matricula_original: # Modo Edição
+            # Remove a matrícula dos dados a serem atualizados, pois ela não deve mudar
+            dados.pop("matricula", None)
+            success, message = db.update_collaborator(matricula_original, dados)
+        else: # Modo Adição
+            success, message = db.add_colaborador(dados)
+        
         if success:
-            messagebox.showinfo("Sucesso", message, parent=window_to_close)
-            window_to_close.destroy()
+            messagebox.showinfo("Sucesso", message, parent=self)
+            if isinstance(self.current_view, MainView):
+                self.current_view.show_colaboradores_view() # Volta para a lista
         else:
-            messagebox.showerror("Erro no Cadastro", message, parent=window_to_close)
+            messagebox.showerror("Erro ao Salvar", message, parent=self)
 
     # --- Métodos de Navegação chamados pela MainView ---
     def show_home_view(self):

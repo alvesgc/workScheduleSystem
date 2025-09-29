@@ -1,5 +1,3 @@
-# src/geradorEscalas/ui/views/gerenciar_colaboradores_view.py
-
 import customtkinter as ctk
 import tkinter.ttk as ttk
 from tkinter import messagebox

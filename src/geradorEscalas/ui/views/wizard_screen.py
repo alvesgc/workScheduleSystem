@@ -1,5 +1,3 @@
-# src/geradorEscalas/ui/wizard_screen.py
-
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 from datetime import datetime, date

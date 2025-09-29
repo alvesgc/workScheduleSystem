@@ -1,5 +1,3 @@
-# src/geradorEscalas/ui/cadastro_screen.py
-
 import customtkinter as ctk
 
 class CadastroScreen:

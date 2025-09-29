@@ -1,5 +1,3 @@
-# src/geradorEscalas/ui/views/main_window_view.py
-
 import customtkinter as ctk
 import tkfontawesome as fa
 from tkinter import messagebox

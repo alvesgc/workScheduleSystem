@@ -1,5 +1,3 @@
-# src/gerador_escalas/ui/views/treeview_style.py
-
 from tkinter import ttk
 
 def setup_treeview_style():

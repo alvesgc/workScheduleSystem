@@ -1,5 +1,3 @@
-# src/geradorEscalas/ui/user_registration_screen.py
-
 import customtkinter as ctk
 
 class UserRegistrationScreen:

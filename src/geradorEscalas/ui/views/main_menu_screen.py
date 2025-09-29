@@ -1,5 +1,3 @@
-# src/geradorEscalas/ui/main_menu_screen.py
-
 import customtkinter as ctk
 
 class MainMenuScreen:
