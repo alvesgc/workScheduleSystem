@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, text
 DB_CONFIG = {
     'host': "localhost",
     'user': "root",
-    'password': "1234", # <<< MUDE AQUI SE NECESSÁRIO
+    'password': "1234",
     'port': "3306",
     'database': "gerador_escala_db"
 }
@@ -84,7 +84,6 @@ def get_all_collaborators_dataframe(search_term=None):
     params = {}
     
     if search_term:
-        # SQLAlchemy usa o formato :key para parâmetros nomeados
         query += " AND (nome LIKE :term OR matricula LIKE :term)"
         params['term'] = f"%{search_term}%"
 
@@ -190,8 +189,6 @@ def batch_update_collaborators(matriculas, field_to_update, new_value):
     if not engine or not matriculas:
         return False, "Nenhum colaborador selecionado para atualização."
     
-    # Lista de campos permitidos para evitar injeção de SQL no nome da coluna.
-    # Garante que apenas estas colunas possam ser atualizadas em lote.
     allowed_fields = ["cargo", "setor", "escala", "tipo_turno", "horario_padrao"]
     if field_to_update.lower() not in allowed_fields:
         return False, f"O campo '{field_to_update}' não é permitido para edição em lote."
@@ -199,13 +196,22 @@ def batch_update_collaborators(matriculas, field_to_update, new_value):
     with engine.connect() as connection:
         trans = connection.begin()
         try:
-            # Construímos a query de forma segura
-            query = text(f"UPDATE colaboradores SET {field_to_update} = :new_value WHERE matricula IN :matriculas_list")
+            # --- LÓGICA DE QUERY CORRIGIDA E ROBUSTA ---
+
+            # 1. Cria placeholders nomeados para a cláusula IN (ex: :m_0, :m_1, ...)
+            in_placeholders = ', '.join([f':m_{i}' for i in range(len(matriculas))])
             
-            result = connection.execute(query, {
-                "new_value": new_value, 
-                "matriculas_list": tuple(matriculas)
-            })
+            # 2. Constrói a query final usando o formato de parâmetro nomeado
+            query_str = f"UPDATE colaboradores SET {field_to_update} = :new_value WHERE matricula IN ({in_placeholders})"
+            
+            # 3. Monta o dicionário de parâmetros
+            params = {"new_value": new_value}
+            # Adiciona os valores das matrículas ao dicionário (ex: {'m_0': '123', 'm_1': '456'})
+            matriculas_dict = {f'm_{i}': mat for i, mat in enumerate(matriculas)}
+            params.update(matriculas_dict)
+
+            # 4. Executa a query com o dicionário de parâmetros
+            result = connection.execute(text(query_str), params)
             
             trans.commit()
             return True, f"{result.rowcount} colaborador(es) atualizado(s) com sucesso."

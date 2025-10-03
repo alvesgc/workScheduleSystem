@@ -34,7 +34,6 @@ def run_import_colaboradores(parent_window):
     required_columns = ["Nome", "Matrícula", "Cargo", "Setor", "Escala", "Tipo de Turno"]
     try:
         df = pd.read_excel(filepath)
-
         # --- LINHA DE CORREÇÃO ADICIONADA ---
         # Substitui todos os valores NaN (nulos) por None, que vira NULL no SQL
         df = df.replace({np.nan: None})
@@ -162,9 +161,63 @@ class App(ctk.CTk):
              self.current_view.show_cadastro_manual_view(matricula_para_editar)
 
     def on_import_colaboradores(self):
-        run_import_colaboradores(self)
-        if isinstance(self.current_view, MainView) and hasattr(self.current_view.content_frame.winfo_children()[0], 'update_table'):
-             self.current_view.content_frame.winfo_children()[0].update_table()
+        """Lida com a importação, validação e separação de colaboradores."""
+        filepath = filedialog.askopenfilename(
+            title="Selecione a planilha com os colaboradores",
+            filetypes=[("Arquivos Excel", "*.xlsx")]
+        )
+        if not filepath: return
+
+        required_columns = ["Nome", "Matrícula", "Cargo", "Setor", "Escala", "Tipo de Turno"]
+        
+        try:
+            df = pd.read_excel(filepath, dtype={'Matrícula': str})
+            df = df.replace({np.nan: None}) # Limpa os NaN
+
+            missing_cols = [col for col in required_columns if col not in df.columns]
+            if missing_cols:
+                messagebox.showerror("Erro de Importação", f"Colunas obrigatórias faltando:\n- {', '.join(missing_cols)}", parent=self)
+                return
+            
+            valid_rows = []
+            invalid_rows = []
+
+            # Separa as linhas em válidas e inválidas
+            for index, row in df.iterrows():
+                # Define quais colunas não podem ser nulas
+                validation_fields = ["Nome", "Matrícula", "Setor", "Escala"]
+                is_valid = all(row.get(col) and str(row.get(col)).strip() != "" for col in validation_fields)
+                
+                if is_valid:
+                    valid_rows.append(row.to_dict())
+                else:
+                    invalid_rows.append(row.to_dict())
+
+            # Insere as linhas válidas no banco de dados
+            sucesso, falhas, erros_msg = 0, 0, []
+            for row_data in valid_rows:
+                is_success, message = db.add_colaborador(row_data)
+                if is_success: sucesso += 1
+                else: falhas += 1; erros_msg.append(message)
+            
+            info_message = f"{sucesso} colaboradores importados com sucesso."
+            if falhas > 0:
+                info_message += f"\n{falhas} falhas na importação (ex: matrículas duplicadas)."
+
+            # Se houver linhas inválidas, carrega-as na tela de gerenciamento
+            if invalid_rows:
+                info_message += f"\n\n{len(invalid_rows)} colaboradores com dados faltantes foram carregados na tabela para sua revisão."
+                if isinstance(self.current_view, MainView):
+                    self.current_view.show_colaboradores_view(invalid_rows=invalid_rows)
+            else:
+                # Se tudo estiver ok, apenas atualiza a tabela
+                if isinstance(self.current_view, MainView):
+                    self.current_view.show_colaboradores_view()
+
+            messagebox.showinfo("Importação Concluída", info_message, parent=self)
+
+        except Exception as e:
+            messagebox.showerror("Erro", f"Ocorreu um erro ao processar a planilha: {e}", parent=self)
 
     def on_save_colaborador(self, dados):
         success, message = run_save_colaborador(dados)

@@ -65,9 +65,11 @@ class MainView(ctk.CTkFrame):
     def show_escala_wizard(self):
         messagebox.showinfo("Navegação", "Aqui abriremos o assistente de Gerar Escala.")
 
-    def show_colaboradores_view(self):
-        self._show_content(GerenciarColaboradoresView, app_controller=self.app_controller)
-
+    def show_colaboradores_view(self, invalid_rows=None):
+        """Exibe a tela de gerenciamento, passando as linhas inválidas se houver."""
+        self._show_content(GerenciarColaboradoresView, 
+                           app_controller=self.app_controller,
+                           invalid_rows=invalid_rows)
     # --- FUNÇÃO CORRIGIDA ---
     def show_cadastro_manual_view(self, matricula_para_editar=None):
         """Mostra a tela de cadastro manual, passando a matrícula se estiver em modo de edição."""

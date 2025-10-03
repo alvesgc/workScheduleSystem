@@ -10,9 +10,10 @@ import os
 import tkfontawesome as fa
 
 class GerenciarColaboradoresView(ctk.CTkFrame):
-    def __init__(self, master, app_controller):
+    def __init__(self, master, app_controller, invalid_rows=None):
         super().__init__(master, fg_color="transparent")
         self.app_controller = app_controller
+        self.invalid_rows = invalid_rows # Armazena as linhas inválidas
         
         self.selected_matriculas = set()
         self.table_data = []
@@ -72,12 +73,14 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
         
         self.update_table()
         
-    def update_table(self, search_term=None, invalid_rows=None):
+    def update_table(self, search_term=None):
         for widget in self.table_frame.winfo_children(): widget.destroy()
         self.selected_matriculas.clear()
-        
-        df = db.get_all_collaborators_dataframe(search_term) if invalid_rows is None else pd.DataFrame(invalid_rows)
-        df.fillna('', inplace=True)
+
+        if self.invalid_rows is not None and search_term is None:
+            df = pd.DataFrame(self.invalid_rows)
+        else:
+            df = db.get_all_collaborators_dataframe(search_term)
         
         columns = list(df.columns)
         
