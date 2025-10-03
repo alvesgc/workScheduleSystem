@@ -28,6 +28,12 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             # Converte para o formato que o ttk.Treeview entende
             self.img_checked = ImageTk.PhotoImage(pil_checked)
             self.img_unchecked = ImageTk.PhotoImage(pil_unchecked)
+             # Ícones para os botões de ação
+            self.icon_add = fa.icon_to_image("plus", fill="white", scale_to_height=16)
+            self.icon_import = fa.icon_to_image("upload", fill="white", scale_to_height=16)
+            self.icon_edit = fa.icon_to_image("pencil-alt", fill="white", scale_to_height=16)
+            self.icon_delete = fa.icon_to_image("trash-alt", fill="white", scale_to_height=16)
+            self.icon_search = fa.icon_to_image("search", fill="white", scale_to_height=16)
             
         except Exception as e:
             print(f"ERRO: Não foi possível carregar as imagens de checkbox: {e}")
