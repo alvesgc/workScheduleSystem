@@ -2,10 +2,10 @@ import customtkinter as ctk
 import tkfontawesome as fa
 from tkinter import messagebox
 
-# Importa as outras views que serão exibidas DENTRO desta
 from .home_view import HomeView
 from .gerenciar_colaboradores_view import GerenciarColaboradoresView
 from .cadastro_manual_view import CadastroManualView
+from .edicao_lote_view import EdicaoEmLoteView
 
 class MainView(ctk.CTkFrame):
     def __init__(self, master, app_controller):
@@ -75,7 +75,13 @@ class MainView(ctk.CTkFrame):
                            save_callback=self.app_controller.on_save_colaborador,
                            back_callback=self.show_colaboradores_view,
                            matricula_para_editar=matricula_para_editar)
-
+        
+    def show_edicao_lote_view(self, matriculas):
+        """Exibe a tela de edição em lote com as matrículas selecionadas."""
+        self._show_content(EdicaoEmLoteView,
+                           app_controller=self.app_controller,
+                           matriculas=matriculas)
+        
     def logout(self):
         if messagebox.askyesno("Sair", "Tem certeza que deseja sair do sistema?", parent=self):
             self.app_controller.show_login_view()

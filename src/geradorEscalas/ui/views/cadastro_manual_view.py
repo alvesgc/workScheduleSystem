@@ -10,7 +10,12 @@ class CadastroManualView(ctk.CTkFrame):
         self.back_callback = back_callback
         self.matricula_para_editar = matricula_para_editar
 
-        self.campos = { "Nome": ctk.StringVar(), "Matrícula": ctk.StringVar(), "Cargo": ctk.StringVar(), "Setor": ctk.StringVar(), "Escala": ctk.StringVar(), "Tipo de Turno": ctk.StringVar(), "Horário Padrão": ctk.StringVar(), "COREN (opcional)": ctk.StringVar(), "Período de Afastamento": ctk.StringVar() }
+        self.campos = {
+            "Nome": ctk.StringVar(), "Matrícula": ctk.StringVar(), "Cargo": ctk.StringVar(),
+            "Setor": ctk.StringVar(), "Escala": ctk.StringVar(), "Tipo de Turno": ctk.StringVar(),
+            "Horário Padrão": ctk.StringVar(), "COREN (opcional)": ctk.StringVar(),
+            "Período de Afastamento": ctk.StringVar()
+        }
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -19,6 +24,7 @@ class CadastroManualView(ctk.CTkFrame):
         self.title_label = ctk.CTkLabel(self, text="Novo Colaborador", font=fonts.TITULO_SECAO)
         self.title_label.grid(row=0, column=0, pady=(0, 20), sticky="w")
         
+        # --- Frame com Rolagem para o Formulário ---
         scrollable_frame = ctk.CTkScrollableFrame(self)
         scrollable_frame.grid(row=1, column=0, sticky="nsew")
         scrollable_frame.grid_columnconfigure(1, weight=1)
@@ -33,22 +39,26 @@ class CadastroManualView(ctk.CTkFrame):
             else:
                 entry = ctk.CTkEntry(scrollable_frame, textvariable=var, height=35, font=fonts.TEXTO_NORMAL)
             
+            # Armazena a referência ao entry da matrícula para poder desabilitá-lo
             if label == "Matrícula":
                 self.matricula_entry = entry
 
             entry.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
 
+        # --- Botões de Ação ---
         button_frame = ctk.CTkFrame(self, fg_color="transparent")
         button_frame.grid(row=2, column=0, pady=20, sticky="ew")
         button_frame.grid_columnconfigure((0, 1), weight=1)
         ctk.CTkButton(button_frame, text="Salvar", command=self._save, height=45, font=fonts.BUTTON_FONT).grid(row=0, column=0, padx=(0, 5), sticky="ew")
         ctk.CTkButton(button_frame, text="Voltar", command=self.back_callback, fg_color="#7A7A7A", hover_color="#5E5E5E", height=45, font=fonts.BUTTON_FONT).grid(row=0, column=1, padx=(5, 0), sticky="ew")
 
+        # Se estiver no modo de edição, carrega os dados
         if self.matricula_para_editar:
             self.load_data_for_editing()
 
     def load_data_for_editing(self):
         """Busca os dados do colaborador no BD e preenche o formulário."""
+        # Agora self.title_label existe e pode ser configurado
         self.title_label.configure(text="Editar Colaborador")
         
         data = db.get_collaborator_by_matricula(self.matricula_para_editar)
@@ -68,17 +78,19 @@ class CadastroManualView(ctk.CTkFrame):
         self.campos["COREN (opcional)"].set(data.get("coren", ""))
         self.campos["Período de Afastamento"].set(data.get("periodo_afastamento", ""))
 
+        # Desabilita o campo de matrícula para não ser alterado
         self.matricula_entry.configure(state="disabled")
 
     def _save(self):
-        dados = {key: var.get() for key, var in self.campos.items()}
+        """Coleta os dados, formata para o BD e chama o callback de salvamento."""
+        dados_ui = {key: var.get() for key, var in self.campos.items()}
         
         # Mapeia os nomes da UI para os nomes das colunas do banco
         dados_para_db = {
-            "nome": dados["Nome"], "matricula": dados["Matrícula"], "cargo": dados["Cargo"],
-            "setor": dados["Setor"], "escala": dados["Escala"], "tipo_turno": dados["Tipo de Turno"],
-            "horario_padrao": dados["Horário Padrão"], "coren": dados["COREN (opcional)"],
-            "periodo_afastamento": dados["Período de Afastamento"]
+            "nome": dados_ui["Nome"], "matricula": dados_ui["Matrícula"], "cargo": dados_ui["Cargo"],
+            "setor": dados_ui["Setor"], "escala": dados_ui["Escala"], "tipo_turno": dados_ui["Tipo de Turno"],
+            "horario_padrao": dados_ui["Horário Padrão"], "coren": dados_ui["COREN (opcional)"],
+            "periodo_afastamento": dados_ui["Período de Afastamento"]
         }
 
         if not dados_para_db["nome"] or not dados_para_db["matricula"]:
@@ -88,4 +100,5 @@ class CadastroManualView(ctk.CTkFrame):
         if "dd/mm/aaaa" in str(dados_para_db["periodo_afastamento"]):
             dados_para_db["periodo_afastamento"] = ""
             
+        # A função de callback agora recebe a matrícula original, se houver
         self.save_callback(dados_para_db, self.matricula_para_editar)

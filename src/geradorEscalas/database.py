@@ -125,17 +125,13 @@ def delete_collaborator_by_matricula(matricula):
 def update_collaborator(matricula, data):
     """Atualiza os dados de um colaborador existente."""
     if not engine: return False, "Motor de conexão não está disponível."
-    
     with engine.connect() as connection:
         trans = connection.begin()
         try:
-            # Constrói a query de atualização dinamicamente
             set_clause = ", ".join([f"{key} = :{key}" for key in data.keys()])
             query_str = f"UPDATE colaboradores SET {set_clause} WHERE matricula = :original_matricula"
-            
             params = data
             params['original_matricula'] = matricula
-            
             connection.execute(text(query_str), params)
             trans.commit()
             return True, "Colaborador atualizado com sucesso."

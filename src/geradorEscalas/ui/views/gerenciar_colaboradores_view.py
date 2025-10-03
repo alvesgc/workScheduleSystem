@@ -7,6 +7,7 @@ from ... import fonts
 import pandas as pd
 from PIL import Image, ImageTk
 import os
+import tkfontawesome as fa
 
 class GerenciarColaboradoresView(ctk.CTkFrame):
     def __init__(self, master, app_controller):
@@ -33,39 +34,38 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             self.img_checked = self.img_unchecked = None
 
         # --- Layout Principal ---
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(1, weight=1) # A linha da tabela é a que expande
         self.grid_columnconfigure(0, weight=1)
 
-        # --- Cabeçalho e Ações ---
-        header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
-        header_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(header_frame, text="Gerenciar Colaboradores", font=fonts.TITULO_SECAO).grid(row=0, column=0, sticky="w")
+        # --- NOVO PAINEL DE CONTROLE (para botões e filtros) ---
+        control_panel = ctk.CTkFrame(self)
+        control_panel.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        control_panel.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(control_panel, text="Gerenciar Colaboradores", font=fonts.TITULO_SECAO).grid(row=0, column=0, padx=20, pady=20)
         
-        action_buttons_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
-        action_buttons_frame.grid(row=0, column=2)
-        ctk.CTkButton(action_buttons_frame, text="Adicionar Novo", command=self.app_controller.show_cadastro_manual_view).pack(side="left", padx=5)
-        ctk.CTkButton(action_buttons_frame, text="Importar", command=self.app_controller.on_import_colaboradores).pack(side="left", padx=5)
-        ctk.CTkButton(action_buttons_frame, text="Editar Selecionado(s)", command=self.edit_selected).pack(side="left", padx=5)
-        ctk.CTkButton(action_buttons_frame, text="Excluir Selecionado(s)", command=self.delete_selected, fg_color="#D63031", hover_color="#B02020").pack(side="left", padx=5)
+        # Botões de Ação com Ícones
+        action_buttons_frame = ctk.CTkFrame(control_panel, fg_color="transparent")
+        action_buttons_frame.grid(row=0, column=2, padx=20)
+        ctk.CTkButton(action_buttons_frame, text="Adicionar", image=self.icon_add, compound="left", command=self.app_controller.show_cadastro_manual_view).pack(side="left", padx=5)
+        ctk.CTkButton(action_buttons_frame, text="Importar", image=self.icon_import, compound="left", command=self.app_controller.on_import_colaboradores).pack(side="left", padx=5)
+        ctk.CTkButton(action_buttons_frame, text="Editar", image=self.icon_edit, compound="left", command=self.edit_selected).pack(side="left", padx=5)
+        ctk.CTkButton(action_buttons_frame, text="Excluir", image=self.icon_delete, compound="left", command=self.delete_selected, fg_color="#D63031", hover_color="#B02020").pack(side="left", padx=5)
 
-        # --- Filtros ---
-        filter_frame = ctk.CTkFrame(self)
-        filter_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=10)
+        # Filtros
         self.search_var = ctk.StringVar()
-        self.search_entry = ctk.CTkEntry(filter_frame, textvariable=self.search_var, placeholder_text="Pesquisar...")
-        self.search_entry.pack(side="left", padx=10, pady=10, fill="x", expand=True)
-        self.search_entry.bind("<Return>", self.perform_search)
-        ctk.CTkButton(filter_frame, text="Pesquisar", command=self.perform_search).pack(side="left", padx=10)
-
-        # --- Tabela ---
-        self.table_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.table_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=10)
+        search_entry = ctk.CTkEntry(control_panel, textvariable=self.search_var, placeholder_text="Pesquisar por nome ou matrícula...", height=35)
+        search_entry.grid(row=1, column=0, columnspan=3, sticky="ew", padx=20, pady=(0, 20))
+        search_entry.bind("<Return>", self.perform_search)
+        
+        # --- Tabela de Dados (agora dentro de seu próprio "Card") ---
+        self.table_frame = ctk.CTkFrame(self)
+        self.table_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         self.table_frame.grid_rowconfigure(0, weight=1)
         self.table_frame.grid_columnconfigure(0, weight=1)
         
         self.update_table()
-
+        
     def update_table(self, search_term=None, invalid_rows=None):
         for widget in self.table_frame.winfo_children(): widget.destroy()
         self.selected_matriculas.clear()
