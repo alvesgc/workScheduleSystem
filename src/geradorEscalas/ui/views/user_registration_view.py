@@ -1,84 +1,94 @@
-import os
-from tkinter import filedialog
 import customtkinter as ctk
-from ... import fonts
+from tkinter import filedialog
 from PIL import Image
+import os
 
 class UserRegistrationView(ctk.CTkFrame):
     def __init__(self, master, save_callback, back_callback):
-        super().__init__(master, fg_color="transparent")
-        
-        if hasattr(master, 'title'):
-            master.title("Cadastro de Novo Usuário")
-        if hasattr(master, 'geometry'):
-            master.geometry("450x450")
-        if hasattr(master, 'resizable'):
-            master.resizable(False, False)
-
+        super().__init__(master)
         self.save_callback = save_callback
         self.back_callback = back_callback
+
+        # Guarda o caminho do arquivo da foto que o usuário selecionou
         self.selected_photo_path = None
-        self.user_var = ctk.StringVar()
-        self.pass_var = ctk.StringVar()
-        self.confirm_pass_var = ctk.StringVar()
-        self.role_var = ctk.StringVar(value='user')
 
-        # Usamos 'self' como o container para os widgets, pois a classe é o próprio frame
-        ctk.CTkLabel(self, text="Cadastro de Usuário", font=fonts.TITULO_SECAO).pack(pady=(20, 30))
-        ctk.CTkLabel(self, text="Foto de Perfil (Opcional):").pack(pady=(20, 5))
-        ctk.CTkLabel(self, text="Nome de Usuário:", anchor="w", width=300, font=fonts.LABEL_FONT).pack()
-        ctk.CTkEntry(self, textvariable=self.user_var, width=300, height=40).pack(pady=(0, 15))
-
-        ctk.CTkLabel(self, text="Senha:", anchor="w", width=300, font=fonts.LABEL_FONT).pack()
-        ctk.CTkEntry(self, textvariable=self.pass_var, show="*", width=300, height=40).pack(pady=(0, 15))
-
-        ctk.CTkLabel(self, text="Confirmar Senha:", anchor="w", width=300, font=fonts.LABEL_FONT).pack()
-        ctk.CTkEntry(self, textvariable=self.confirm_pass_var, show="*", width=300, height=40).pack(pady=(0, 15))
-
-        ctk.CTkLabel(self, text="Tipo de Acesso (Role):", anchor="w", width=300, font=fonts.LABEL_FONT).pack()
-        ctk.CTkComboBox(self, variable=self.role_var, values=['user', 'admin'], state='readonly', width=300, height=40).pack(pady=(0, 25))
+        # --- Layout Principal ---
+        self.pack_propagate(False) # Impede que o frame se ajuste aos widgets internos
         
-        button_frame = ctk.CTkFrame(self, fg_color="transparent")
-        button_frame.pack(fill='x', padx=50)
+        # Frame interno para centralizar o conteúdo
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(expand=True, padx=30, pady=20)
 
-        ctk.CTkButton(button_frame, text="Salvar Cadastro", command=self._save, height=45).pack(side='left', expand=True, padx=(0, 5))
-        ctk.CTkButton(button_frame, text="Voltar", command=self.back_callback, fg_color="#7A7A7A", hover_color="#5E5E5E").pack(side='left', expand=True, padx=(5, 0))
-       
-        self.photo_preview = ctk.CTkLabel(self, text="")
-        self.photo_preview.pack(pady=5)
+        ctk.CTkLabel(main_frame, text="Cadastro de Usuário", font=("", 24, "bold")).pack(pady=(0, 20))
+
+        # --- Seção da Foto de Perfil ---
+        ctk.CTkLabel(main_frame, text="Foto de Perfil (Opcional):").pack(anchor="w")
+
+        # Label para mostrar a pré-visualização da imagem
+        self.photo_preview = ctk.CTkLabel(main_frame, text="")
+        self.photo_preview.pack(pady=10)
         self._load_and_display_image() # Carrega a imagem padrão inicial
-        ctk.CTkButton(self, text="Selecionar Foto...", command=self._select_photo).pack(pady=5)
-    def _save(self):
-        dados = {"username": self.user_var.get(), "password": self.pass_var.get(), "confirm_password": self.confirm_pass_var.get(), "role": self.role_var.get()}
-        self.save_callback(dados)
+
+        ctk.CTkButton(main_frame, text="Selecionar Foto...", command=self._select_photo).pack(pady=(0, 20))
+
+        # --- Campos de Dados ---
+        ctk.CTkLabel(main_frame, text="Nome de Usuário:").pack(anchor="w")
+        self.user_entry = ctk.CTkEntry(main_frame, placeholder_text="Digite o nome de usuário")
+        self.user_entry.pack(fill="x", pady=5)
+
+        ctk.CTkLabel(main_frame, text="Senha:").pack(anchor="w", pady=(10, 0))
+        self.pass_entry = ctk.CTkEntry(main_frame, placeholder_text="Digite a senha", show="*")
+        self.pass_entry.pack(fill="x", pady=5)
+
+        ctk.CTkLabel(main_frame, text="Confirmar Senha:").pack(anchor="w", pady=(10, 0))
+        self.confirm_pass_entry = ctk.CTkEntry(main_frame, placeholder_text="Confirme a senha", show="*")
+        self.confirm_pass_entry.pack(fill="x", pady=5)
+
+        ctk.CTkLabel(main_frame, text="Tipo de Acesso (Role):").pack(anchor="w", pady=(10, 0))
+        self.role_menu = ctk.CTkOptionMenu(main_frame, values=["user", "admin"])
+        self.role_menu.pack(fill="x", pady=5)
+
+        # --- Botões de Ação ---
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(fill="x", pady=(30, 0))
+        button_frame.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkButton(button_frame, text="Salvar", command=self._on_save, height=40).grid(row=0, column=0, padx=(0, 5), sticky="ew")
+        ctk.CTkButton(button_frame, text="Voltar", command=self.back_callback, height=40, fg_color="#7A7A7A", hover_color="#5E5E5E").grid(row=0, column=1, padx=(5, 0), sticky="ew")
+
     def _load_and_display_image(self, path=None):
-        """Carrega e exibe uma imagem. Usa uma genérica se o caminho for nulo."""
-        generic_path = "src/geradorEscalas/assets/icons/user_generic.png" # Crie ou use uma imagem genérica
+        """Carrega e exibe uma imagem na tela, usando uma genérica como padrão."""
+        # Caminho para sua imagem genérica. Verifique se este caminho está correto.
+        generic_path = "src/geradorEscalas/assets/icons/user_generic.png"
+        
+        image_path = generic_path
+        if path and os.path.exists(path):
+            image_path = path
         
         try:
-            image_path = path if path and os.path.exists(path) else generic_path
             image = ctk.CTkImage(Image.open(image_path), size=(100, 100))
             self.photo_preview.configure(image=image)
         except Exception as e:
             print(f"Erro ao carregar imagem de perfil: {e}")
+            self.photo_preview.configure(image=None, text="Erro ao\ncarregar\nimagem")
 
     def _select_photo(self):
-        """Abre um diálogo para o usuário selecionar uma foto."""
+        """Abre uma janela para o usuário selecionar uma foto de perfil."""
         filepath = filedialog.askopenfilename(
             title="Selecione uma foto de perfil",
-            filetypes=[("Imagens", "*.png *.jpg *.jpeg *.gif")]
+            filetypes=[("Imagens", "*.png *.jpg *.jpeg")]
         )
         if filepath:
             self.selected_photo_path = filepath
             self._load_and_display_image(filepath)
 
     def _on_save(self):
-        """Coleta todos os dados, incluindo a foto, e chama o callback."""
+        """Coleta todos os dados do formulário e os envia para o controlador principal."""
         data = {
             "username": self.user_entry.get(),
             "password": self.pass_entry.get(),
             "confirm_password": self.confirm_pass_entry.get(),
             "role": self.role_menu.get(),
-            "photo_path": self.selected_photo_path # Envia o caminho da foto original
+            "photo_path": self.selected_photo_path # Envia o caminho do arquivo original selecionado
         }
-        self.save_callback(data, self) # Passa 'self' para o controller poder fechar a janela
+        self.save_callback(data) # Chama a função on_save_user no __main__.py
