@@ -300,3 +300,55 @@ def batch_update_collaborators(matriculas, field_to_update, new_value):
         except Exception as e:
             trans.rollback()
             return False, f"Erro de banco de dados: {e}"
+
+def get_all_active_collaborators():
+    """Busca todos os colaboradores ativos com seus dados de escala e retorna como lista de dicionários."""
+    if not engine: return []
+    
+    with engine.connect() as connection:
+        query = text("""
+            SELECT matricula, nome, escala, escala_data_base, escala_sequencia_atual
+            FROM colaboradores
+            WHERE ativo = TRUE
+        """)
+        result = connection.execute(query).fetchall()
+        # Converte o resultado para uma lista de dicionários para fácil manipulação
+        return [row._asdict() for row in result]
+    
+def get_unconfigured_collaborators():
+    """Busca colaboradores com escalas cíclicas que não têm uma data base definida."""
+    if not engine: return []
+    with engine.connect() as connection:
+        # Seleciona apenas os que têm escalas conhecidas que precisam de data base
+        query = text("""
+            SELECT matricula, nome, escala
+            FROM colaboradores
+            WHERE ativo = TRUE
+            AND escala IN ('12x36', '24x72', '24x120')
+            AND escala_data_base IS NULL
+        """)
+        result = connection.execute(query).fetchall()
+        return [row._asdict() for row in result]
+
+def update_collaborator_base_dates(updates):
+    """
+    Atualiza a escala_data_base para múltiplos colaboradores.
+    'updates' deve ser um dicionário como: {'matricula': 'YYYY-MM-DD', ...}
+    """
+    if not engine or not updates: return False, "Nenhum dado para atualizar."
+    
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            for matricula, data_base in updates.items():
+                query = text("""
+                    UPDATE colaboradores
+                    SET escala_data_base = :data_base
+                    WHERE matricula = :matricula
+                """)
+                connection.execute(query, {"data_base": data_base, "matricula": matricula})
+            trans.commit()
+            return True, "Datas de referência salvas com sucesso."
+        except Exception as e:
+            trans.rollback()
+            return False, f"Erro ao salvar datas de referência: {e}"
