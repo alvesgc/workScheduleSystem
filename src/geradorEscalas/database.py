@@ -29,11 +29,11 @@ def get_user_by_username(username):
     if not engine: return None
     
     with engine.connect() as connection:
-        query = text("SELECT * FROM usuarios WHERE username = :user")
+        query = text("SELECT *, foto_path FROM usuarios WHERE username = :user")
         result = connection.execute(query, {"user": username}).fetchone()
         return result._asdict() if result else None
 
-def add_user(username, password, role):
+def add_user(username, password, role, photo_path=None):
     """Adiciona um novo usuário ao banco de dados com senha criptografada."""
     if not engine: return False, "Motor de conexão com o banco de dados não está disponível."
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
@@ -41,8 +41,8 @@ def add_user(username, password, role):
     with engine.connect() as connection:
         trans = connection.begin()
         try:
-            query = text("INSERT INTO usuarios (username, password_hash, role) VALUES (:user, :pwd_hash, :role)")
-            connection.execute(query, {"user": username, "pwd_hash": hashed_password.decode('utf-8'), "role": role})
+            query = text("INSERT INTO usuarios (username, password_hash, role,  foto_path) VALUES (:user, :pwd_hash, :role, :photo)")
+            connection.execute(query, {"user": username, "pwd_hash": hashed_password.decode('utf-8'), "role": role, "photo": photo_path})
             trans.commit()
             return True, f"Usuário '{username}' criado com sucesso!"
         except Exception as e:

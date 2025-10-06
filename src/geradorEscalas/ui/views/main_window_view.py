@@ -1,6 +1,7 @@
+import os
 import customtkinter as ctk
 import tkfontawesome as fa
-from tkinter import messagebox
+from tkinter import Image, messagebox
 
 # Importa as outras views que serão exibidas DENTRO desta
 from .home_view import HomeView
@@ -9,54 +10,100 @@ from .cadastro_manual_view import CadastroManualView
 from .edicao_lote_view import EdicaoEmLoteView
 
 class MainView(ctk.CTkFrame):
-    def __init__(self, master, app_controller):
+    def __init__(self, master, app_controller, user_data, photo_path=None):
         super().__init__(master, fg_color="#242424")
         self.app_controller = app_controller
-
         self.sidebar_expanded = True
-        self.grid_columnconfigure(0, minsize=250) 
-        self.grid_columnconfigure(1, weight=1)
+        self.user_data = user_data
+        
+        self.username = self.user_data.get('username', 'Usuário').title()
+        
         self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
 
         # --- Sidebar ---
-        self.sidebar_frame = ctk.CTkFrame(self, corner_radius=0)
+        self.sidebar_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#2B2B2B")
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(5, weight=1)
+        self.sidebar_frame.grid_rowconfigure(6, weight=1)
 
-        icon_color = "white"
+        # --- Ícones ---
+        icon_color = "#E0E0E0"
         icon_size = 20
-        self.icon_home = fa.icon_to_image("home", fill=icon_color, scale_to_height=icon_size)
-        self.icon_calendar = fa.icon_to_image("calendar-alt", fill=icon_color, scale_to_height=icon_size)
-        self.icon_users = fa.icon_to_image("users", fill=icon_color, scale_to_height=icon_size)
-        self.icon_logout = fa.icon_to_image("sign-out-alt", fill=icon_color, scale_to_height=icon_size)
-        self.icon_menu = fa.icon_to_image("bars", fill=icon_color, scale_to_height=icon_size)
-        self.icon_close = fa.icon_to_image("times", fill=icon_color, scale_to_height=icon_size)
+        self.icons = {
+            "home": fa.icon_to_image("home", fill=icon_color, scale_to_height=icon_size),
+            "calendar": fa.icon_to_image("calendar-alt", fill=icon_color, scale_to_height=icon_size),
+            "users": fa.icon_to_image("users", fill=icon_color, scale_to_height=icon_size),
+            "logout": fa.icon_to_image("sign-out-alt", fill=icon_color, scale_to_height=icon_size),
+            "menu": fa.icon_to_image("bars", fill=icon_color, scale_to_height=icon_size),
+            "close": fa.icon_to_image("times", fill=icon_color, scale_to_height=icon_size), # NOVO: Ícone de fechar
+            "user_profile": fa.icon_to_image("user-circle", fill=icon_color, scale_to_height=36)
+        }   
+        try:
+            user_image_path = photo_path if photo_path and os.path.exists(photo_path) else "caminho/para/user_generic.png"
+            user_pil_image = Image.open(user_image_path).resize((36, 36))
+            self.icons["user_profile"] = ctk.CTkImage(user_pil_image)
+        except Exception:
+            # Fallback para o ícone de FontAwesome se a imagem falhar
+            self.icons["user_profile"] = fa.icon_to_image("user-circle", fill="#E0E0E0", scale_to_height=36)
+            self.hamburger_button = ctk.CTkButton(self.sidebar_frame, text="", image=self.icons["menu"], width=40, command=self.toggle_sidebar, fg_color="transparent", hover_color="#4A4A4A")
+            self.hamburger_button.grid(row=0, column=0, padx=20, pady=20, sticky="nw")
 
-        self.hamburger_button = ctk.CTkButton(self.sidebar_frame, text="", image=self.icon_menu, width=40,
-                                              command=self.toggle_sidebar, fg_color="transparent", hover_color="#4A4A4A")
-        self.hamburger_button.grid(row=0, column=0, padx=20, pady=20, sticky="w")
+        # --- Frame do Perfil do Usuário ---
+        self.profile_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        self.profile_frame.grid(row=1, column=0, padx=20, pady=20, sticky="ew")
         
-        self.hamburger_button = ctk.CTkButton(self.sidebar_frame, text="", image=self.icon_menu, width=40,
-                                            command=self.toggle_sidebar, fg_color="transparent", hover_color="#4A4A4A")
-        self.hamburger_button.grid(row=0, column=0, padx=20, pady=20, sticky="w")
+        large_user_icon = fa.icon_to_image("user-circle", fill=icon_color, scale_to_height=48)
+        self.profile_icon = ctk.CTkLabel(self.profile_frame, text="", image=large_user_icon)
+        self.profile_icon.pack(pady=(5, 5)) 
+        
+        username = self.user_data.get('username', 'Usuário').title()
+        
+        self.profile_name = ctk.CTkLabel(self.profile_frame, text=self.username, font=("", 14, "bold"))
+        self.profile_name.pack(pady=(0, 10))
 
-        self.home_button = ctk.CTkButton(self.sidebar_frame, text="Início", image=self.icon_home, compound="left", anchor="w", command=self.show_home_view)
-        self.home_button.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        # --- Dicionário e Estilos para Botões de Navegação ---
+        self.nav_buttons = {}
+        self.style_inactive = {"fg_color": "transparent", "hover_color": "#3A3A3A"}
+        self.style_active = {"fg_color": "#1F6AA5", "hover_color": "#1F6AA5"}
 
-        self.escala_button = ctk.CTkButton(self.sidebar_frame, text="Gerar Escala", image=self.icon_calendar, compound="left", anchor="w", command=self.show_escala_wizard)
-        self.escala_button.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+        button_info = [
+            ("home", "Início", "home", self.show_home_view, 2),
+            ("escala", "Gerar Escala", "calendar", self.show_escala_wizard, 3),
+            ("colaboradores", "Colaboradores", "users", self.show_colaboradores_view, 4)
+        ]
 
-        self.colab_button = ctk.CTkButton(self.sidebar_frame, text="Colaboradores", image=self.icon_users, compound="left", anchor="w", command=self.show_colaboradores_view)
-        self.colab_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
+        for name, text, icon_key, command, row in button_info:
+            button = ctk.CTkButton(self.sidebar_frame, text=text, image=self.icons[icon_key],
+                                   compound="left", anchor="w", **self.style_inactive,
+                                   command=lambda cmd=command, btn_name=name: self._navigate(cmd, btn_name))
+            button.grid(row=row, column=0, padx=20, pady=12, sticky="ew")
+            self.nav_buttons[name] = button
 
-        self.logout_button = ctk.CTkButton(self.sidebar_frame, text="Sair", image=self.icon_logout, compound="left", anchor="w", command=self.logout, fg_color="#C43E3E", hover_color="#A03030")
-        self.logout_button.grid(row=6, column=0, padx=20, pady=20, sticky="s")
+        # --- Botão de Sair ---
+        self.logout_button = ctk.CTkButton(self.sidebar_frame, text="Sair", image=self.icons["logout"],
+                                           compound="left", anchor="w", command=self.logout,
+                                           fg_color="#C43E3E", hover_color="#A03030")
+        self.logout_button.grid(row=7, column=0, padx=20, pady=20, sticky="s")
 
         # --- Área de Conteúdo ---
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.content_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
         
-        self.show_home_view()
+        self.content_frame.grid_rowconfigure(0, weight=1)
+        self.content_frame.grid_columnconfigure(0, weight=1)
+        
+        self._navigate(self.show_home_view, "home")
+        
+        # Inicia a aplicação
+        self._navigate(self.show_home_view, "home")
+
+    def _navigate(self, command, button_name):
+        command()
+        self._highlight_button(button_name)
+
+    def _highlight_button(self, active_button_name):
+        for name, button in self.nav_buttons.items():
+            button.configure(**(self.style_active if name == active_button_name else self.style_inactive))
 
     def _clear_content_frame(self):
         for widget in self.content_frame.winfo_children():
@@ -64,8 +111,6 @@ class MainView(ctk.CTkFrame):
 
     def _show_content(self, ViewClass, *args, **kwargs):
         self._clear_content_frame()
-        self.content_frame.grid_columnconfigure(0, weight=1)
-        self.content_frame.grid_rowconfigure(0, weight=1)
         view = ViewClass(self.content_frame, *args, **kwargs)
         view.grid(row=0, column=0, sticky="nsew")
 
@@ -97,24 +142,31 @@ class MainView(ctk.CTkFrame):
 
     def logout(self):
         if messagebox.askyesno("Sair", "Tem certeza que deseja sair do sistema?", parent=self):
-            self.app_controller.show_login_view()
+            self.app_controller.logout()
 
     def toggle_sidebar(self):
         self.sidebar_expanded = not self.sidebar_expanded
         
         if self.sidebar_expanded:
-            # Expande instantaneamente
-            self.grid_columnconfigure(0, minsize=250)
-            self.hamburger_button.configure(image=self.icon_menu)
-            self.home_button.configure(text="Início", anchor="w")
-            self.escala_button.configure(text="Gerar Escala", anchor="w")
-            self.colab_button.configure(text="Colaboradores", anchor="w")
+            self.sidebar_frame.configure(width=250)
+            self.hamburger_button.configure(image=self.icons["menu"])
+            self.profile_name.configure(text=self.username)
+            
+            # --- CORREÇÃO: Acessar botões pelo dicionário ---
+            self.nav_buttons['home'].configure(text="Início", anchor="w")
+            self.nav_buttons['escala'].configure(text="Gerar Escala", anchor="w")
+            self.nav_buttons['colaboradores'].configure(text="Colaboradores", anchor="w")
+            
             self.logout_button.configure(text="Sair", anchor="w")
         else:
-            # Recolhe instantaneamente
-            self.grid_columnconfigure(0, minsize=70)
-            self.hamburger_button.configure(image=self.icon_close)
-            self.home_button.configure(text="", anchor="center")
-            self.escala_button.configure(text="", anchor="center")
-            self.colab_button.configure(text="", anchor="center")
+            self.sidebar_frame.configure(width=70)
+            self.hamburger_button.configure(image=self.icons["close"])
+            self.profile_name.configure(text="")
+
+            # --- CORREÇÃO: Acessar botões pelo dicionário ---
+            self.nav_buttons['home'].configure(text="", anchor="center")
+            self.nav_buttons['escala'].configure(text="", anchor="center")
+            self.nav_buttons['colaboradores'].configure(text="", anchor="center")
+            
             self.logout_button.configure(text="", anchor="center")
+        

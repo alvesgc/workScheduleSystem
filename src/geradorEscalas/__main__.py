@@ -1,3 +1,5 @@
+import os
+import shutil
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import bcrypt
@@ -74,39 +76,63 @@ class App(ctk.CTk):
         self.state("zoomed")
         self.resizable(True, True)
         self.protocol("WM_DELETE_WINDOW", self.quit)
-
+        
         self.current_view = None
         self.show_login_view()
-
-    def _show_view(self, ViewClass, *args, **kwargs):
-        """Limpa a janela e exibe uma nova view principal nela."""
-        if self.current_view:
-            self.current_view.destroy()
+        self.current_user_info = None
         
-        self.current_view = ViewClass(self, *args, **kwargs)
-        self.current_view.pack(expand=True, fill="both")
-
-    def show_login_view(self):
-        self.title("Acesso ao Sistema")
-        self._show_view(LoginView, 
-                        login_callback=self.on_login, 
-                        register_callback=self.show_registration_view)
-
     def on_login(self, username, password):
         user = db.get_user_by_username(username)
         if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
+            self.current_user_info = user
             self.show_main_view()
         else:
             messagebox.showerror("Falha no Login", "Usuário ou senha inválidos.", parent=self)
 
     def show_main_view(self):
         self.title("Gerador de Escalas - Painel Principal")
-        self._show_view(MainView, app_controller=self)
+        if self.current_user_info:
+            self._show_view(
+                MainView,
+                app_controller=self,  # <-- Adicionado explicitamente aqui
+                user_data=self.current_user_info
+            )
+        else:
+            messagebox.showerror("Erro de Acesso", "Não foi possível carregar os dados do usuário.")
+            self.show_login_view()
+        
+    def logout(self):
+        self.current_user_info = None # Limpa o usuário ao sair
+        self.show_login_view()
+        
+    def show_login_view(self):
+        """Prepara e exibe a tela de login inicial."""
+        self.title("Acesso ao Sistema")
+        self._show_view(LoginView,
+                        login_callback=self.on_login,
+                        register_callback=self.show_registration_view)
+    def _show_view(self, ViewClass, *args, **kwargs):
+        """Método centralizado para limpar a janela e exibir uma nova view."""
+        if self.current_view:
+            self.current_view.destroy()
+            
+        kwargs['app_controller'] = self
+        
+        self.current_view = ViewClass(self, *args, **kwargs)
+        self.current_view.pack(expand=True, fill="both")
+
+    def _show_view(self, ViewClass, *args, **kwargs):
+        if self.current_view:
+            self.current_view.destroy()
+        
+        # Agora, o método apenas cria a view com os argumentos que recebeu.
+        self.current_view = ViewClass(self, *args, **kwargs)
+        self.current_view.pack(expand=True, fill="both")
 
     def show_registration_view(self):
         reg_window = ctk.CTkToplevel(self)
         view = UserRegistrationView(reg_window, 
-                                    save_callback=lambda data: self.on_save_user(data, reg_window), 
+                                    save_callback=lambda data, win=reg_window: self.on_save_user(data, win), 
                                     back_callback=reg_window.destroy)
         view.pack(expand=True, fill="both")
         reg_window.transient(self)
@@ -128,20 +154,41 @@ class App(ctk.CTk):
             messagebox.showerror("Erro ao Salvar", message, parent=self)
 
     def on_save_user(self, data, window_to_close):
-        """Valida e salva um novo usuário."""
-        username, password, confirm_password, role = data.values()
+        """--- REFATORADO: Lógica unificada para salvar usuário com ou sem foto ---"""
+        username = data.get("username")
+        password = data.get("password")
+        confirm_password = data.get("confirm_password")
+        role = data.get("role")
+        original_photo_path = data.get("photo_path")
+
         if not username or not password:
             messagebox.showwarning("Campos Vazios", "Usuário e Senha são obrigatórios.", parent=window_to_close)
             return
         if password != confirm_password:
             messagebox.showerror("Erro de Senha", "As senhas não coincidem.", parent=window_to_close)
             return
-        success, message = db.add_user(username, password, role)
+
+        db_photo_path = None
+        if original_photo_path:
+            profile_pics_dir = "src/geradorEscalas/assets/user_profiles"
+            os.makedirs(profile_pics_dir, exist_ok=True)
+            file_extension = os.path.splitext(original_photo_path)[1]
+            new_filename = f"{username.lower()}{file_extension}"
+            destination_path = os.path.join(profile_pics_dir, new_filename)
+            try:
+                shutil.copy(original_photo_path, destination_path)
+                db_photo_path = destination_path
+            except Exception as e:
+                messagebox.showerror("Erro ao Salvar Foto", f"Não foi possível salvar a imagem: {e}", parent=window_to_close)
+                return
+
+        success, message = db.add_user(username, password, role, photo_path=db_photo_path)
+        
         if success:
             messagebox.showinfo("Sucesso", message, parent=window_to_close)
             window_to_close.destroy()
         else:
-            messagebox.showerror("Erro no Cadastro", message, parent=window_to_close)
+            messagebox.showerror("Erro no Cadastro", message, parent=window_to_close)   
             
     # --- Métodos de Navegação chamados pela MainView ---
     def show_home_view(self):
@@ -275,9 +322,6 @@ class App(ctk.CTk):
         # Volta para a tela de gerenciamento atualizada
         if isinstance(self.current_view, MainView):
             self.current_view.show_colaboradores_view()
-    
-    def logout(self):
-        self.show_login_view()
 
 if __name__ == "__main__":
     app = App()
