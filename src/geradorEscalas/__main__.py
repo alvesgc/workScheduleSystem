@@ -12,7 +12,8 @@ from .ui.views import (
     UserRegistrationView,
     HomeView,
     CadastroView,
-    CadastroManualView
+    CadastroManualView,
+    EdicaoEmLoteView
 )
 from . import database as db
 from . import fonts
@@ -161,60 +162,76 @@ class App(ctk.CTk):
              self.current_view.show_cadastro_manual_view(matricula_para_editar)
 
     def on_import_colaboradores(self):
-        """Lida com a importação, validação e separação de colaboradores."""
+        """
+        Lida com a importação, validação, salva os registros válidos
+        e move os inválidos para a tela de gerenciamento para correção.
+        """
         filepath = filedialog.askopenfilename(
             title="Selecione a planilha com os colaboradores",
             filetypes=[("Arquivos Excel", "*.xlsx")]
         )
         if not filepath: return
 
-        required_columns = ["Nome", "Matrícula", "Cargo", "Setor", "Escala", "Tipo de Turno"]
-        
-        try:
-            df = pd.read_excel(filepath, dtype={'Matrícula': str})
-            df = df.replace({np.nan: None}) # Limpa os NaN
+        # Colunas obrigatórias no arquivo Excel
+        required_file_columns = ["Nome", "Matrícula", "Cargo", "Setor", "Escala", "Tipo de Turno"]
+        # Colunas obrigatórias para um registro ser considerado válido no BD
+        required_db_fields = ["Nome", "Matrícula"]
 
-            missing_cols = [col for col in required_columns if col not in df.columns]
+        try:
+            # Força as colunas esperadas a serem lidas como texto (string)
+            tipos_de_dados = {
+                "Nome": str,
+                "Matrícula": str,
+                "Cargo": str,
+                "Setor": str,
+                "Escala": str,
+                "Tipo de Turno": str
+            }
+            df = pd.read_excel(filepath, dtype=tipos_de_dados)
+            # Limpa os valores nulos do Pandas para None do Python
+            df = df.replace({np.nan: None})
+
+            # 1. Validação Estrutural (Verifica se as colunas existem no arquivo)
+            missing_cols = [col for col in required_file_columns if col not in df.columns]
             if missing_cols:
-                messagebox.showerror("Erro de Importação", f"Colunas obrigatórias faltando:\n- {', '.join(missing_cols)}", parent=self)
+                messagebox.showerror("Erro de Importação", f"A planilha não pode ser importada.\nColunas obrigatórias faltando:\n\n- {', '.join(missing_cols)}", parent=self)
                 return
             
             valid_rows = []
             invalid_rows = []
 
-            # Separa as linhas em válidas e inválidas
+            # 2. Separa as linhas em válidas e inválidas
             for index, row in df.iterrows():
-                # Define quais colunas não podem ser nulas
-                validation_fields = ["Nome", "Matrícula", "Setor", "Escala"]
-                is_valid = all(row.get(col) and str(row.get(col)).strip() != "" for col in validation_fields)
-                
+                # Verifica se os campos obrigatórios da linha têm conteúdo
+                is_valid = all(row.get(col) and str(row.get(col)).strip() not in ["", "None"] for col in required_db_fields)
                 if is_valid:
                     valid_rows.append(row.to_dict())
                 else:
                     invalid_rows.append(row.to_dict())
 
-            # Insere as linhas válidas no banco de dados
-            sucesso, falhas, erros_msg = 0, 0, []
+            # 3. Insere as linhas válidas no banco de dados
+            sucesso, falhas = 0, 0
             for row_data in valid_rows:
-                is_success, message = db.add_colaborador(row_data)
+                is_success, _ = db.add_colaborador(row_data)
                 if is_success: sucesso += 1
-                else: falhas += 1; erros_msg.append(message)
+                else: falhas += 1
             
-            info_message = f"{sucesso} colaboradores importados com sucesso."
-            if falhas > 0:
-                info_message += f"\n{falhas} falhas na importação (ex: matrículas duplicadas)."
+            # 4. Prepara a mensagem de resumo
+            info_message = f"{sucesso} colaboradores válidos importados com sucesso."
+            if falhas > 0: info_message += f"\n{falhas} falharam (ex: matrículas duplicadas)."
 
-            # Se houver linhas inválidas, carrega-as na tela de gerenciamento
+            # 5. Se houver linhas inválidas, navega para a tela de gerenciamento com elas
             if invalid_rows:
                 info_message += f"\n\n{len(invalid_rows)} colaboradores com dados faltantes foram carregados na tabela para sua revisão."
+                messagebox.showinfo("Importação Parcial", info_message, parent=self)
+                # Navega para a tela de colaboradores, passando apenas os inválidos
                 if isinstance(self.current_view, MainView):
                     self.current_view.show_colaboradores_view(invalid_rows=invalid_rows)
             else:
-                # Se tudo estiver ok, apenas atualiza a tabela
+                messagebox.showinfo("Importação Concluída", info_message, parent=self)
+                # Se tudo estiver ok, apenas atualiza a tabela com todos os dados do banco
                 if isinstance(self.current_view, MainView):
                     self.current_view.show_colaboradores_view()
-
-            messagebox.showinfo("Importação Concluída", info_message, parent=self)
 
         except Exception as e:
             messagebox.showerror("Erro", f"Ocorreu um erro ao processar a planilha: {e}", parent=self)
@@ -238,10 +255,9 @@ class App(ctk.CTk):
         else:
             messagebox.showerror("Erro", message, parent=self)
             
-    def show_edicao_lote_view(self, matriculas):
-        """Instrui a MainView a mostrar a tela de edição em lote."""
+    def show_edicao_lote_view(self, dados_selecionados):
         if isinstance(self.current_view, MainView):
-            self.current_view.show_edicao_lote_view(matriculas)
+            self.current_view.show_edicao_lote_view(dados_selecionados)
             
     def on_batch_update(self, matriculas, changes):
         """

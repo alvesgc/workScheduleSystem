@@ -76,26 +76,29 @@ def get_all_collaborators_dataframe(search_term=None):
     """Busca os colaboradores, opcionalmente filtrando, e retorna como DataFrame."""
     if not engine: return pd.DataFrame()
     
-    query = """
+    # A construção da query está correta
+    query_str = """
         SELECT nome, matricula, cargo, setor, tipo_turno, horario_padrao, coren AS conselho
         FROM colaboradores WHERE ativo = TRUE
     """
-    # Usaremos um dicionário para os parâmetros, que é mais robusto
     params = {}
     
     if search_term:
-        query += " AND (nome LIKE :term OR matricula LIKE :term)"
+        query_str += " AND (nome LIKE :term OR matricula LIKE :term)"
         params['term'] = f"%{search_term}%"
 
-    query += " ORDER BY nome"
+    query_str += " ORDER BY nome"
     
     try:
-        # Passa o dicionário de parâmetros para o pandas
-        df = pd.read_sql(query, engine, params=params)
+        # --- A CORREÇÃO ESTÁ AQUI ---
+        # Envolvemos a string da query com a função text() do SQLAlchemy
+        # para garantir que os parâmetros sejam processados corretamente.
+        df = pd.read_sql(text(query_str), engine, params=params)
         return df
     except Exception as e:
         print(f"Erro ao executar a pesquisa no banco de dados: {e}")
         return pd.DataFrame()
+    
 def get_collaborator_by_matricula(matricula):
     """Busca os dados de um colaborador específico pela matrícula."""
     if not engine: return None
@@ -104,23 +107,36 @@ def get_collaborator_by_matricula(matricula):
         result = connection.execute(query, {"matricula": matricula}).fetchone()
         return result._asdict() if result else None
     
-def delete_collaborator_by_matricula(matricula):
-    """Deleta um colaborador do banco de dados pela matrícula."""
-    if not engine: return False, "Motor de conexão com o banco de dados não está disponível."
+def delete_collaborators_by_matriculas(matriculas):
+    """Deleta múltiplos colaboradores do banco de uma só vez."""
+    if not matriculas:
+        return False, "Nenhuma matrícula fornecida para exclusão."
+    if not engine: 
+        return False, "Motor de conexão não está disponível."
+
     with engine.connect() as connection:
         trans = connection.begin()
         try:
-            query = text("DELETE FROM colaboradores WHERE matricula = :matricula")
-            result = connection.execute(query, {"matricula": matricula})
+            # 1. Cria placeholders nomeados para a cláusula IN (ex: :m_0, :m_1, ...)
+            # Isso é crucial para a segurança e evita injeção de SQL.
+            in_placeholders = ', '.join([f':m_{i}' for i in range(len(matriculas))])
+            
+            # 2. Constrói a query final
+            query_str = f"DELETE FROM colaboradores WHERE matricula IN ({in_placeholders})"
+            
+            # 3. Monta o dicionário de parâmetros para o SQLAlchemy
+            # (Ex: {'m_0': '123', 'm_1': '456'})
+            params = {f'm_{i}': mat for i, mat in enumerate(matriculas)}
+
+            # 4. Executa a query com os parâmetros
+            result = connection.execute(text(query_str), params)
+            
             trans.commit()
-            if result.rowcount > 0:
-                return True, "Colaborador excluído com sucesso."
-            else:
-                return False, "Nenhum colaborador encontrado com a matrícula fornecida."
+            return True, f"{result.rowcount} colaborador(es) excluído(s) com sucesso."
         except Exception as e:
             trans.rollback()
-            return False, f"Erro de banco de dados: {e}"
-        
+            return False, f"Erro de banco de dados ao excluir em lote: {e}"
+
 def update_collaborator(matricula, data):
     """Atualiza os dados de um colaborador existente."""
     if not engine: return False, "Motor de conexão não está disponível."

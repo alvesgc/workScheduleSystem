@@ -2,6 +2,7 @@ import customtkinter as ctk
 import tkfontawesome as fa
 from tkinter import messagebox
 
+# Importa as outras views que serão exibidas DENTRO desta
 from .home_view import HomeView
 from .gerenciar_colaboradores_view import GerenciarColaboradoresView
 from .cadastro_manual_view import CadastroManualView
@@ -66,10 +67,10 @@ class MainView(ctk.CTkFrame):
         messagebox.showinfo("Navegação", "Aqui abriremos o assistente de Gerar Escala.")
 
     def show_colaboradores_view(self, invalid_rows=None):
-        """Exibe a tela de gerenciamento, passando as linhas inválidas se houver."""
         self._show_content(GerenciarColaboradoresView, 
-                           app_controller=self.app_controller,
-                           invalid_rows=invalid_rows)
+                        app_controller=self.app_controller,
+                        data_to_load=invalid_rows)
+
     # --- FUNÇÃO CORRIGIDA ---
     def show_cadastro_manual_view(self, matricula_para_editar=None):
         """Mostra a tela de cadastro manual, passando a matrícula se estiver em modo de edição."""
@@ -77,13 +78,12 @@ class MainView(ctk.CTkFrame):
                            save_callback=self.app_controller.on_save_colaborador,
                            back_callback=self.show_colaboradores_view,
                            matricula_para_editar=matricula_para_editar)
-        
-    def show_edicao_lote_view(self, matriculas):
-        """Exibe a tela de edição em lote com as matrículas selecionadas."""
+     # --- MÉTODO NOVO ADICIONADO AQUI ---
+    def show_edicao_lote_view(self, dados_selecionados):
         self._show_content(EdicaoEmLoteView,
-                           app_controller=self.app_controller,
-                           matriculas=matriculas)
-        
+                        app_controller=self.app_controller,
+                        dados_para_editar=dados_selecionados)
+
     def logout(self):
         if messagebox.askyesno("Sair", "Tem certeza que deseja sair do sistema?", parent=self):
             self.app_controller.show_login_view()
