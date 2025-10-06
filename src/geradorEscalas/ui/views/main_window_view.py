@@ -1,7 +1,8 @@
 import os
 import customtkinter as ctk
 import tkfontawesome as fa
-from tkinter import Image, messagebox
+from tkinter import messagebox
+from PIL import Image as PIL_Image,ImageDraw 
 
 # Importa as outras views que serão exibidas DENTRO desta
 from .home_view import HomeView
@@ -10,7 +11,7 @@ from .cadastro_manual_view import CadastroManualView
 from .edicao_lote_view import EdicaoEmLoteView
 
 class MainView(ctk.CTkFrame):
-    def __init__(self, master, app_controller, user_data, photo_path=None):
+    def __init__(self, master, app_controller, user_data):
         super().__init__(master, fg_color="#242424")
         self.app_controller = app_controller
         self.sidebar_expanded = True
@@ -35,28 +36,43 @@ class MainView(ctk.CTkFrame):
             "users": fa.icon_to_image("users", fill=icon_color, scale_to_height=icon_size),
             "logout": fa.icon_to_image("sign-out-alt", fill=icon_color, scale_to_height=icon_size),
             "menu": fa.icon_to_image("bars", fill=icon_color, scale_to_height=icon_size),
-            "close": fa.icon_to_image("times", fill=icon_color, scale_to_height=icon_size), # NOVO: Ícone de fechar
-            "user_profile": fa.icon_to_image("user-circle", fill=icon_color, scale_to_height=36)
-        }   
+            "close": fa.icon_to_image("times", fill=icon_color, scale_to_height=icon_size)
+        } 
+         
+        photo_path = self.user_data.get('foto_path')
+        generic_photo_path = "src/geradorEscalas/assets/icons/user_generic.png"
+        image_size = (48, 48)
         try:
-            user_image_path = photo_path if photo_path and os.path.exists(photo_path) else "caminho/para/user_generic.png"
-            user_pil_image = Image.open(user_image_path).resize((36, 36))
-            self.icons["user_profile"] = ctk.CTkImage(user_pil_image)
-        except Exception:
-            # Fallback para o ícone de FontAwesome se a imagem falhar
-            self.icons["user_profile"] = fa.icon_to_image("user-circle", fill="#E0E0E0", scale_to_height=36)
-            self.hamburger_button = ctk.CTkButton(self.sidebar_frame, text="", image=self.icons["menu"], width=40, command=self.toggle_sidebar, fg_color="transparent", hover_color="#4A4A4A")
-            self.hamburger_button.grid(row=0, column=0, padx=20, pady=20, sticky="nw")
+            final_path = None
+            if photo_path and os.path.exists(photo_path):
+                final_path = photo_path
+            elif os.path.exists(generic_photo_path):
+                final_path = final_path = generic_photo_path
+    
+            if final_path:
+                pil_image = PIL_Image.open(final_path).resize(image_size, PIL_Image.Resampling.LANCZOS)
+                # --- AQUI ESTÁ A LÓGICA PARA TORNAR A IMAGEM CIRCULAR ---
+                mask = PIL_Image.new('L', image_size, 0) # Cria uma máscara preta
+                draw = ImageDraw.Draw(mask)
+                draw.ellipse((0, 0) + image_size, fill=255) # Desenha um círculo branco na máscara
+                
+                # Aplica a máscara à imagem
+                circular_pil_image = PIL_Image.new('RGBA', image_size, (0, 0, 0, 0)) # Cria uma imagem transparente
+                circular_pil_image.paste(pil_image, (0, 0), mask) # Cola a imagem original usando a máscara
+
+                self.profile_image = ctk.CTkImage(light_image=circular_pil_image, dark_image=circular_pil_image, size=image_size)
+            else:
+                raise FileNotFoundError("Nenhuma imagem de perfil encontrada.")
+        except Exception as e:
+            print(f"AVISO: Não foi possível carregar a imagem de perfil ({e}). Usando ícone padrão.")
+            self.profile_image = fa.icon_to_image("user-circle", fill="#E0E0E0", scale_to_height=48)
 
         # --- Frame do Perfil do Usuário ---
         self.profile_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
         self.profile_frame.grid(row=1, column=0, padx=20, pady=20, sticky="ew")
         
-        large_user_icon = fa.icon_to_image("user-circle", fill=icon_color, scale_to_height=48)
-        self.profile_icon = ctk.CTkLabel(self.profile_frame, text="", image=large_user_icon)
+        self.profile_icon = ctk.CTkLabel(self.profile_frame, text="", image=self.profile_image)
         self.profile_icon.pack(pady=(5, 5)) 
-        
-        username = self.user_data.get('username', 'Usuário').title()
         
         self.profile_name = ctk.CTkLabel(self.profile_frame, text=self.username, font=("", 14, "bold"))
         self.profile_name.pack(pady=(0, 10))

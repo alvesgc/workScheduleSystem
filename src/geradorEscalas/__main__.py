@@ -71,19 +71,33 @@ class App(ctk.CTk):
         super().__init__()
 
         fonts.init_fonts()
-
-        self.title("Gerador de Escalas")
-        self.state("zoomed")
-        self.resizable(True, True)
+        
+        self.title("Acesso ao Sistema")
+        self.geometry("400x500") # Tamanho fixo e menor para o login
+        self.resizable(False, False) # A tela de login não deve ser redimensionável
+        self.center_window() # Nova função para centralizar a janela
         self.protocol("WM_DELETE_WINDOW", self.quit)
         
         self.current_view = None
         self.show_login_view()
         self.current_user_info = None
         
+    def center_window(self):
+        """Centraliza a janela atual no meio da tela."""
+        self.update_idletasks() # Garante que as dimensões da janela estejam atualizadas
+        width = self.winfo_width()
+        height = self.winfo_height()
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f'{width}x{height}+{x}+{y}')
+        
     def on_login(self, username, password):
         user = db.get_user_by_username(username)
         if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
+            self.state("zoomed")
+            self.geometry("1280x720")
+            self.resizable(True, True) 
+            self.center_window() 
             self.current_user_info = user
             self.show_main_view()
         else:
@@ -94,7 +108,7 @@ class App(ctk.CTk):
         if self.current_user_info:
             self._show_view(
                 MainView,
-                app_controller=self,  # <-- Adicionado explicitamente aqui
+                app_controller=self, 
                 user_data=self.current_user_info
             )
         else:
@@ -103,6 +117,8 @@ class App(ctk.CTk):
         
     def logout(self):
         self.current_user_info = None # Limpa o usuário ao sair
+        self.geometry("400x500")
+        self.resizable(False, False)
         self.show_login_view()
         
     def show_login_view(self):
@@ -131,7 +147,7 @@ class App(ctk.CTk):
 
     def show_registration_view(self):
         reg_window = ctk.CTkToplevel(self)
-        reg_window.title("Cadastro de Usuário") # Define o título da janela
+        reg_window.title("Cadastro de Usuário")    # Define o título da janela
         reg_window.geometry("450x700")             # Define a largura x altura
         reg_window.resizable(False, False)         # Impede que o usuário redimensione
 
