@@ -78,7 +78,7 @@ def get_all_collaborators_dataframe(search_term=None):
     
     # A construção da query está correta
     query_str = """
-        SELECT nome, matricula, cargo, setor, tipo_turno, horario_padrao, coren AS conselho
+        SELECT nome, matricula, cargo, setor, escala
         FROM colaboradores WHERE ativo = TRUE
     """
     params = {}

@@ -24,7 +24,7 @@ class MainView(ctk.CTkFrame):
         self.sidebar_frame.grid_rowconfigure(5, weight=1)
 
         icon_color = "white"
-        icon_size = 22
+        icon_size = 20
         self.icon_home = fa.icon_to_image("home", fill=icon_color, scale_to_height=icon_size)
         self.icon_calendar = fa.icon_to_image("calendar-alt", fill=icon_color, scale_to_height=icon_size)
         self.icon_users = fa.icon_to_image("users", fill=icon_color, scale_to_height=icon_size)
@@ -36,10 +36,21 @@ class MainView(ctk.CTkFrame):
                                               command=self.toggle_sidebar, fg_color="transparent", hover_color="#4A4A4A")
         self.hamburger_button.grid(row=0, column=0, padx=20, pady=20, sticky="w")
         
-        ctk.CTkButton(self.sidebar_frame, text="Início", image=self.icon_home, compound="left", anchor="w", command=self.show_home_view).grid(row=1, column=0, padx=20, pady=10, sticky="ew")
-        ctk.CTkButton(self.sidebar_frame, text="Gerar Escala", image=self.icon_calendar, compound="left", anchor="w", command=self.show_escala_wizard).grid(row=2, column=0, padx=20, pady=10, sticky="ew")
-        ctk.CTkButton(self.sidebar_frame, text="Colaboradores", image=self.icon_users, compound="left", anchor="w", command=self.show_colaboradores_view).grid(row=3, column=0, padx=20, pady=10, sticky="ew")
-        ctk.CTkButton(self.sidebar_frame, text="Sair", image=self.icon_logout, compound="left", anchor="w", command=self.logout, fg_color="#C43E3E", hover_color="#A03030").grid(row=6, column=0, padx=20, pady=20, sticky="s")
+        self.hamburger_button = ctk.CTkButton(self.sidebar_frame, text="", image=self.icon_menu, width=40,
+                                            command=self.toggle_sidebar, fg_color="transparent", hover_color="#4A4A4A")
+        self.hamburger_button.grid(row=0, column=0, padx=20, pady=20, sticky="w")
+
+        self.home_button = ctk.CTkButton(self.sidebar_frame, text="Início", image=self.icon_home, compound="left", anchor="w", command=self.show_home_view)
+        self.home_button.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+
+        self.escala_button = ctk.CTkButton(self.sidebar_frame, text="Gerar Escala", image=self.icon_calendar, compound="left", anchor="w", command=self.show_escala_wizard)
+        self.escala_button.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+
+        self.colab_button = ctk.CTkButton(self.sidebar_frame, text="Colaboradores", image=self.icon_users, compound="left", anchor="w", command=self.show_colaboradores_view)
+        self.colab_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
+
+        self.logout_button = ctk.CTkButton(self.sidebar_frame, text="Sair", image=self.icon_logout, compound="left", anchor="w", command=self.logout, fg_color="#C43E3E", hover_color="#A03030")
+        self.logout_button.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
         # --- Área de Conteúdo ---
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -90,17 +101,20 @@ class MainView(ctk.CTkFrame):
 
     def toggle_sidebar(self):
         self.sidebar_expanded = not self.sidebar_expanded
+        
         if self.sidebar_expanded:
-            self.master.grid_columnconfigure(0, minsize=250)
+            # Expande instantaneamente
+            self.grid_columnconfigure(0, minsize=250)
+            self.hamburger_button.configure(image=self.icon_menu)
             self.home_button.configure(text="Início", anchor="w")
             self.escala_button.configure(text="Gerar Escala", anchor="w")
             self.colab_button.configure(text="Colaboradores", anchor="w")
             self.logout_button.configure(text="Sair", anchor="w")
-            self.hamburger_button.configure(image=self.icon_menu)
         else:
-            self.master.grid_columnconfigure(0, minsize=70)
+            # Recolhe instantaneamente
+            self.grid_columnconfigure(0, minsize=70)
+            self.hamburger_button.configure(image=self.icon_close)
             self.home_button.configure(text="", anchor="center")
             self.escala_button.configure(text="", anchor="center")
             self.colab_button.configure(text="", anchor="center")
             self.logout_button.configure(text="", anchor="center")
-            self.hamburger_button.configure(image=self.icon_close)
