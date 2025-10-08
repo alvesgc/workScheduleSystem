@@ -1,7 +1,7 @@
 import mysql.connector
 import bcrypt
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from sqlalchemy import create_engine, text
 
 # --- CONFIGURAÇÕES DE BANCO DE DADOS (CORRIGIDO) ---
@@ -309,7 +309,7 @@ def get_all_active_collaborators():
         query = text("""
             SELECT matricula, nome, escala, escala_data_base, escala_sequencia_atual
             FROM colaboradores
-            WHERE ativo = TRUE
+            WHERE ativo = 1
         """)
         result = connection.execute(query).fetchall()
         # Converte o resultado para uma lista de dicionários para fácil manipulação
@@ -352,3 +352,73 @@ def update_collaborator_base_dates(updates):
         except Exception as e:
             trans.rollback()
             return False, f"Erro ao salvar datas de referência: {e}"
+        
+def update_sequencia_colaborador(matricula, nova_sequencia):
+    """Atualiza a coluna escala_sequencia_atual para um colaborador específico."""
+    if not engine:
+        return False, "Motor de conexão não está disponível."
+    
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            query = text("""
+                UPDATE colaboradores 
+                SET escala_sequencia_atual = :nova_sequencia 
+                WHERE matricula = :matricula
+            """)
+            connection.execute(query, {"nova_sequencia": nova_sequencia, "matricula": matricula})
+            trans.commit()
+            return True, "Sequência atualizada com sucesso."
+        except Exception as e:
+            trans.rollback()
+            return False, f"Erro ao atualizar sequência: {e}"
+        
+def salvar_escala_no_historico(dados_escala, ano, mes):
+    """
+    Salva uma escala gerada na tabela 'escalas_geradas'.
+    Primeiro, apaga qualquer escala antiga para o mesmo período/colaboradores.
+    """
+    if not engine or not dados_escala:
+        return False, "Nenhum dado de escala para salvar."
+
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            # Pega a lista de matrículas da escala gerada
+            matriculas_na_escala = list(dados_escala.keys())
+            
+            # 1. (Opcional, mas recomendado) Deleta o histórico antigo para este mês/ano/colaboradores
+            # para evitar duplicatas se o usuário gerar e salvar várias vezes.
+            delete_query = text("""
+                DELETE FROM escalas_geradas 
+                WHERE ano_referencia = :ano AND mes_referencia = :mes AND colaborador_matricula IN :matriculas
+            """)
+            connection.execute(delete_query, {"ano": ano, "mes": mes, "matriculas": matriculas_na_escala})
+
+            # 2. Insere os novos registros
+            insert_query = text("""
+                INSERT INTO escalas_geradas 
+                (colaborador_matricula, data_turno, mes_referencia, ano_referencia) 
+                VALUES (:matricula, :data_turno, :mes, :ano)
+            """)
+            
+            registros_para_inserir = []
+            for matricula, info in dados_escala.items():
+                for dia in info.get('dias', []):
+                    # O 'dia' aqui é um dicionário {'dia': X, 'turno': 'Y'}
+                    data_do_turno = date(ano, mes, dia['dia'])
+                    registros_para_inserir.append({
+                        "matricula": matricula,
+                        "data_turno": data_do_turno.strftime('%Y-%m-%d'),
+                        "mes": mes,
+                        "ano": ano
+                    })
+            
+            if registros_para_inserir:
+                connection.execute(insert_query, registros_para_inserir)
+            
+            trans.commit()
+            return True, f"Escala de {mes}/{ano} salva com sucesso no histórico."
+        except Exception as e:
+            trans.rollback()
+            return False, f"Erro ao salvar histórico: {e}"

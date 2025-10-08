@@ -161,17 +161,21 @@ class App(ctk.CTk):
         reg_window.focus()
     
     def on_save_colaborador(self, dados, matricula_original=None):
-        if matricula_original: # Modo Edição
-            # Remove a matrícula dos dados a serem atualizados, pois ela não deve mudar
-            dados.pop("matricula", None)
+        """
+        Salva um novo colaborador ou atualiza um existente.
+        """
+        if matricula_original:  # Modo de Edição
+            # Remove a matrícula dos 'dados' se ela existir, pois não deve ser alterada
+            dados.pop("matricula", None) 
             success, message = db.update_collaborator(matricula_original, dados)
-        else: # Modo Adição
+        else:  # Modo de Adição
             success, message = db.add_colaborador(dados)
         
         if success:
             messagebox.showinfo("Sucesso", message, parent=self)
+            # Após salvar, atualiza e volta para a tela de gerenciamento
             if isinstance(self.current_view, MainView):
-                self.current_view.show_colaboradores_view() # Volta para a lista
+                self.current_view.show_colaboradores_view()
         else:
             messagebox.showerror("Erro ao Salvar", message, parent=self)
 
@@ -304,15 +308,6 @@ class App(ctk.CTk):
 
         except Exception as e:
             messagebox.showerror("Erro", f"Ocorreu um erro ao processar a planilha: {e}", parent=self)
-
-    def on_save_colaborador(self, dados):
-        success, message = run_save_colaborador(dados)
-        if success:
-            messagebox.showinfo("Sucesso", message, parent=self)
-            if isinstance(self.current_view, MainView):
-                self.current_view.show_colaboradores_view() # Volta para a lista após salvar
-        else:
-            messagebox.showerror("Erro ao Salvar", message, parent=self)
             
     def on_delete_collaborators(self, matriculas):
         """Deleta múltiplos colaboradores e atualiza a tabela."""
@@ -344,7 +339,13 @@ class App(ctk.CTk):
         # Volta para a tela de gerenciamento atualizada
         if isinstance(self.current_view, MainView):
             self.current_view.show_colaboradores_view()
-
+    def on_save_escala_historico(self, dados_escala, mes, ano):
+            """Chama a função do banco de dados para salvar a escala e exibe o resultado."""
+            success, message = db.salvar_escala_no_historico(dados_escala, ano, mes)
+            if success:
+                messagebox.showinfo("Sucesso", message, parent=self.current_view)
+            else:
+                messagebox.showerror("Erro", message, parent=self.current_view)
 if __name__ == "__main__":
     app = App()
     app.mainloop()
