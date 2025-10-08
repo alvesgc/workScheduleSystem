@@ -1,4 +1,5 @@
 from calendar import monthrange, weekday
+import os
 import customtkinter as ctk
 import tkinter.ttk as ttk
 from tkinter import filedialog, messagebox
@@ -449,12 +450,24 @@ class GeradorEscalaView(ctk.CTkFrame):
             row_count += 1
 
     def _salvar_no_historico(self):
+        """Pega a última escala gerada e pede ao controller para salvá-la, com confirmação."""
         if self.ultima_escala_gerada:
-            mes_numero = self.meses_map[self.mes_var.get()]
-            ano = int(self.ano_var.get())
-            self.app_controller.on_save_escala_historico(
-                self.ultima_escala_gerada, mes_numero, ano
+            mes_nome = self.mes_var.get()
+            ano = self.ano_var.get()
+
+            # --- ADIÇÃO DA CONFIRMAÇÃO ---
+            confirmar = messagebox.askyesno(
+                "Confirmar",
+                f"Deseja salvar a escala de {mes_nome}/{ano} no histórico?\n"
+                "Isso irá sobrescrever qualquer escala salva anteriormente para este mesmo período.",
+                parent=self,
             )
+
+            if confirmar:
+                mes_numero = self.meses_map[mes_nome]
+                self.app_controller.on_save_escala_historico(
+                    self.ultima_escala_gerada, mes_numero, int(ano)
+                )
         else:
             messagebox.showwarning(
                 "Aviso", "Nenhuma escala foi gerada para salvar.", parent=self
@@ -485,6 +498,15 @@ class GeradorEscalaView(ctk.CTkFrame):
                     f"Arquivo Excel salvo em:\n{caminho_arquivo}",
                     parent=self,
                 )
+                abrir_pasta = messagebox.askyesno(
+                    "Sucesso",
+                    f"Arquivo Excel salvo com sucesso!\n\nDeseja abrir a pasta onde o arquivo foi salvo?",
+                    parent=self,
+                )
+                if abrir_pasta:
+                    # Abre o explorador de arquivos na pasta do arquivo salvo
+                    os.startfile(os.path.dirname(caminho_arquivo))
+
             except Exception as e:
                 messagebox.showerror(
                     "Erro na Exportação",
@@ -515,6 +537,15 @@ class GeradorEscalaView(ctk.CTkFrame):
                 messagebox.showinfo(
                     "Sucesso", f"Arquivo PDF salvo em:\n{caminho_arquivo}", parent=self
                 )
+                abrir_pasta = messagebox.askyesno(
+                    "Sucesso",
+                    f"Arquivo Excel salvo com sucesso!\n\nDeseja abrir a pasta onde o arquivo foi salvo?",
+                    parent=self,
+                )
+                if abrir_pasta:
+                    # Abre o explorador de arquivos na pasta do arquivo salvo
+                    os.startfile(os.path.dirname(caminho_arquivo))
+
             except Exception as e:
                 messagebox.showerror(
                     "Erro na Exportação",
