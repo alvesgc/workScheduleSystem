@@ -1,6 +1,7 @@
 import customtkinter as ctk
-from ... import database as db  # Importa o módulo de banco de dados
+from ... import database as db
 from ... import fonts
+import tkfontawesome as fa
 
 
 class HomeView(ctk.CTkFrame):
@@ -14,6 +15,22 @@ class HomeView(ctk.CTkFrame):
         # --- Layout do Grid ---
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure(2, weight=1)  # Linha dos painéis de info expande
+
+        # --- Ícones para o Dashboard ---
+        icon_color = "#DCE4EE"
+        icon_size = 32
+        self.icon_users = fa.icon_to_image(
+            "users", fill=icon_color, scale_to_height=icon_size
+        )
+        self.icon_sitemap = fa.icon_to_image(
+            "sitemap", fill=icon_color, scale_to_height=icon_size
+        )
+        self.icon_calendar = fa.icon_to_image(
+            "calendar-plus", fill=icon_color, scale_to_height=20
+        )
+        self.icon_user_cog = fa.icon_to_image(
+            "user-cog", fill=icon_color, scale_to_height=20
+        )
 
         # --- Cabeçalho ---
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -35,20 +52,32 @@ class HomeView(ctk.CTkFrame):
         stats_frame.grid_columnconfigure((0, 1), weight=1)
 
         # Card 1: Colaboradores Ativos
-        card1 = ctk.CTkFrame(stats_frame, border_width=1)
+        card1 = ctk.CTkFrame(stats_frame)
         card1.grid(row=0, column=0, padx=(0, 10), sticky="ew")
+        card1.grid_columnconfigure(1, weight=1)  # Faz a coluna do texto expandir
+        ctk.CTkLabel(card1, text="", image=self.icon_users).grid(
+            row=0, column=0, rowspan=2, padx=20, pady=20
+        )
         ctk.CTkLabel(
-            card1, text=stats.get("total_colaboradores", 0), font=fonts.SUBTITULO
-        ).pack(pady=(10, 0))
-        ctk.CTkLabel(card1, text="Colaboradores Ativos").pack(pady=(0, 10))
+            card1, text=stats.get("total_colaboradores", 0), font=fonts.TITULO_CARD
+        ).grid(row=0, column=1, sticky="sw")
+        ctk.CTkLabel(card1, text="Colaboradores Ativos", text_color="gray60").grid(
+            row=1, column=1, sticky="nw"
+        )
 
         # Card 2: Setores Gerenciados
-        card2 = ctk.CTkFrame(stats_frame, border_width=1)
+        card2 = ctk.CTkFrame(stats_frame)
         card2.grid(row=0, column=1, padx=(10, 0), sticky="ew")
+        card2.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(card2, text="", image=self.icon_sitemap).grid(
+            row=0, column=0, rowspan=2, padx=20, pady=20
+        )
         ctk.CTkLabel(
-            card2, text=stats.get("total_setores", 0), font=fonts.SUBTITULO
-        ).pack(pady=(10, 0))
-        ctk.CTkLabel(card2, text="Setores Gerenciados").pack(pady=(0, 10))
+            card2, text=stats.get("total_setores", 0), font=fonts.TITULO_CARD
+        ).grid(row=0, column=1, sticky="sw")
+        ctk.CTkLabel(card2, text="Setores Gerenciados", text_color="gray60").grid(
+            row=1, column=1, sticky="nw"
+        )
 
         # --- Painéis de Informação ---
         info_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -57,11 +86,11 @@ class HomeView(ctk.CTkFrame):
         info_frame.grid_rowconfigure(0, weight=1)
 
         # Painel da Esquerda: Próximos Afastamentos
-        leaves_panel = ctk.CTkFrame(info_frame)
-        leaves_panel.grid(row=0, column=0, padx=(0, 10), sticky="nsew")
+        leaves_panel = ctk.CTkFrame(self)  # Fundo sólido para melhor agrupamento visual
+        leaves_panel.grid(row=2, column=0, columnspan=2, pady=20, sticky="nsew")
         ctk.CTkLabel(
             leaves_panel, text="Próximos Afastamentos (30 dias)", font=fonts.LABEL_FONT
-        ).pack(pady=10, padx=10, anchor="w")
+        ).pack(pady=10, padx=20, anchor="w")
 
         scrollable_leaves = ctk.CTkScrollableFrame(leaves_panel, fg_color="transparent")
         scrollable_leaves.pack(fill="both", expand=True, padx=5)
@@ -71,11 +100,14 @@ class HomeView(ctk.CTkFrame):
                 ctk.CTkLabel(
                     scrollable_leaves,
                     text=f"• {leave['nome']} - Início: {leave['data_inicio']}",
-                ).pack(anchor="w", padx=10)
+                    font=fonts.TEXTO_NORMAL,
+                ).pack(anchor="w", padx=10, pady=2)
         else:
-            ctk.CTkLabel(scrollable_leaves, text="Nenhum afastamento programado.").pack(
-                padx=10
-            )
+            ctk.CTkLabel(
+                scrollable_leaves,
+                text="Nenhum afastamento programado.",
+                text_color="gray60",
+            ).pack(expand=True)
 
         # --- Botões de Ação ---
         action_frame = ctk.CTkFrame(self, fg_color="transparent")

@@ -7,13 +7,14 @@ LABEL_FONT = None
 BUTTON_FONT = None
 TITULO_SECAO = None
 SUBTITULO = None
+TITULO_CARD = None
 
 def init_fonts():
     """
     Esta função deve ser chamada UMA VEZ no início da aplicação.
     Ela carrega os arquivos de fonte .ttf/.otf e cria os objetos CTkFont.
     """
-    global TEXTO_NORMAL, LABEL_FONT, BUTTON_FONT, TITULO_SECAO, SUBTITULO
+    global TEXTO_NORMAL, LABEL_FONT, BUTTON_FONT, TITULO_SECAO, SUBTITULO,TITULO_CARD
 
     try:
         # Caminho para a pasta de fontes
@@ -32,7 +33,9 @@ def init_fonts():
         LABEL_FONT = ctk.CTkFont(family="Poppins Bold", size=14)
         BUTTON_FONT = ctk.CTkFont(family="Poppins Bold", size=14)
         TITULO_SECAO = ctk.CTkFont(family="Poppins Bold", size=28)
+        TITULO_CARD = ctk.CTkFont(family="Poppins Bold", size=48)
         SUBTITULO = ctk.CTkFont(family="Poppins", size=16)
+
 
         print("Fontes Poppins carregadas com sucesso.")
         return True

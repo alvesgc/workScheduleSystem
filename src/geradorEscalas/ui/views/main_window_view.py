@@ -4,7 +4,7 @@ import tkfontawesome as fa
 from tkinter import messagebox
 from PIL import Image as PIL_Image, ImageDraw
 from ... import fonts
-# Importa as outras views que serão exibidas DENTRO desta
+
 from .home_view import HomeView
 from .gerenciar_colaboradores_view import GerenciarColaboradoresView
 from .cadastro_manual_view import CadastroManualView
