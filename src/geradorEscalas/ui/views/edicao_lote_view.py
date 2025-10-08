@@ -72,7 +72,7 @@ class EdicaoEmLoteView(ctk.CTkFrame):
         button_frame.grid_columnconfigure((0,1), weight=1)
         
         ctk.CTkButton(button_frame, text="Salvar Alterações", command=self._save, height=45).grid(row=0, column=0, padx=(0, 5), sticky="ew")
-        ctk.CTkButton(button_frame, text="Cancelar", command=self.app_controller.show_colaboradores_view, fg_color="#7A7A7A", hover_color="#5E5E5E").grid(row=0, column=1, padx=(5, 0), sticky="ew")
+        ctk.CTkButton(button_frame, text="Cancelar", command=self.app_controller.show_colaboradores_view, height=45, fg_color="#7A7A7A", hover_color="#5E5E5E").grid(row=0, column=1, padx=(5, 0), sticky="ew")
 
     def _save(self):
         changes = {}
