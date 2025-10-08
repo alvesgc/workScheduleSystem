@@ -3,7 +3,7 @@ import customtkinter as ctk
 import tkfontawesome as fa
 from tkinter import messagebox
 from PIL import Image as PIL_Image, ImageDraw
-
+from ... import fonts
 # Importa as outras views que serão exibidas DENTRO desta
 from .home_view import HomeView
 from .gerenciar_colaboradores_view import GerenciarColaboradoresView
@@ -107,7 +107,7 @@ class MainView(ctk.CTkFrame):
         self.profile_icon.pack(pady=(5, 5))
 
         self.profile_name = ctk.CTkLabel(
-            self.profile_frame, text=self.username, font=("", 14, "bold")
+            self.profile_frame, text=self.username, font=fonts.LABEL_FONT
         )
         self.profile_name.pack(pady=(0, 10))
 
@@ -135,11 +135,13 @@ class MainView(ctk.CTkFrame):
                 image=self.icons[icon_key],
                 compound="left",
                 anchor="w",
-                **self.style_inactive,
+                font=fonts.BUTTON_FONT,
                 command=lambda cmd=command, btn_name=name: self._navigate(
                     cmd, btn_name
                 ),
             )
+            button.configure(**self.style_inactive)
+            
             button.grid(row=row, column=0, padx=20, pady=12, sticky="ew")
             self.nav_buttons[name] = button
 
@@ -153,6 +155,7 @@ class MainView(ctk.CTkFrame):
             command=self.logout,
             fg_color="#C43E3E",
             hover_color="#A03030",
+            font=(fonts.BUTTON_FONT)
         )
         self.logout_button.grid(row=7, column=0, padx=20, pady=20, sticky="s")
 
