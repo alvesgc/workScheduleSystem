@@ -301,78 +301,113 @@ def batch_update_collaborators(matriculas, field_to_update, new_value):
             trans.rollback()
             return False, f"Erro de banco de dados: {e}"
 
-def get_all_active_collaborators():
-    """Busca todos os colaboradores ativos com seus dados de escala e retorna como lista de dicionários."""
+
+def get_all_active_collaborators(filtros=None):
+    """
+    Busca colaboradores ativos, aplicando filtros opcionais.
+    Filtros é um dicionário: {'escala_types': ['12x36'], 'matriculas': ['123']}
+    """
     if not engine: return []
     
+    params = {}
+    query_str = """
+        SELECT matricula, nome, escala, escala_data_base, escala_sequencia_atual
+        FROM colaboradores
+        WHERE ativo = 1
+    """
+
+    if filtros:
+        if filtros.get("escala_types"):
+            in_placeholders = ', '.join([f':escala_{i}' for i in range(len(filtros["escala_types"]))])
+            query_str += f" AND escala IN ({in_placeholders})"
+            params.update({f'escala_{i}': val for i, val in enumerate(filtros["escala_types"])})
+
+        if filtros.get("matriculas"):
+            in_placeholders = ', '.join([f':mat_{i}' for i in range(len(filtros["matriculas"]))])
+            query_str += f" AND matricula IN ({in_placeholders})"
+            params.update({f'mat_{i}': val for i, val in enumerate(filtros["matriculas"])})
+
+    query_str += " ORDER BY nome"
+
     with engine.connect() as connection:
-        query = text("""
-            SELECT matricula, nome, escala, escala_data_base, escala_sequencia_atual
-            FROM colaboradores
-            WHERE ativo = 1
-        """)
-        result = connection.execute(query).fetchall()
-        # Converte o resultado para uma lista de dicionários para fácil manipulação
+        query = text(query_str)
+        result = connection.execute(query, params).fetchall()
         return [row._asdict() for row in result]
-    
+
+
 def get_unconfigured_collaborators():
     """Busca colaboradores com escalas cíclicas que não têm uma data base definida."""
-    if not engine: return []
+    if not engine:
+        return []
     with engine.connect() as connection:
         # Seleciona apenas os que têm escalas conhecidas que precisam de data base
-        query = text("""
+        query = text(
+            """
             SELECT matricula, nome, escala
             FROM colaboradores
             WHERE ativo = TRUE
             AND escala IN ('12x36', '24x72', '24x120')
             AND escala_data_base IS NULL
-        """)
+        """
+        )
         result = connection.execute(query).fetchall()
         return [row._asdict() for row in result]
+
 
 def update_collaborator_base_dates(updates):
     """
     Atualiza a escala_data_base para múltiplos colaboradores.
     'updates' deve ser um dicionário como: {'matricula': 'YYYY-MM-DD', ...}
     """
-    if not engine or not updates: return False, "Nenhum dado para atualizar."
-    
+    if not engine or not updates:
+        return False, "Nenhum dado para atualizar."
+
     with engine.connect() as connection:
         trans = connection.begin()
         try:
             for matricula, data_base in updates.items():
-                query = text("""
+                query = text(
+                    """
                     UPDATE colaboradores
                     SET escala_data_base = :data_base
                     WHERE matricula = :matricula
-                """)
-                connection.execute(query, {"data_base": data_base, "matricula": matricula})
+                """
+                )
+                connection.execute(
+                    query, {"data_base": data_base, "matricula": matricula}
+                )
             trans.commit()
             return True, "Datas de referência salvas com sucesso."
         except Exception as e:
             trans.rollback()
             return False, f"Erro ao salvar datas de referência: {e}"
-        
+
+
 def update_sequencia_colaborador(matricula, nova_sequencia):
     """Atualiza a coluna escala_sequencia_atual para um colaborador específico."""
     if not engine:
         return False, "Motor de conexão não está disponível."
-    
+
     with engine.connect() as connection:
         trans = connection.begin()
         try:
-            query = text("""
+            query = text(
+                """
                 UPDATE colaboradores 
                 SET escala_sequencia_atual = :nova_sequencia 
                 WHERE matricula = :matricula
-            """)
-            connection.execute(query, {"nova_sequencia": nova_sequencia, "matricula": matricula})
+            """
+            )
+            connection.execute(
+                query, {"nova_sequencia": nova_sequencia, "matricula": matricula}
+            )
             trans.commit()
             return True, "Sequência atualizada com sucesso."
         except Exception as e:
             trans.rollback()
             return False, f"Erro ao atualizar sequência: {e}"
-        
+
+
 def salvar_escala_no_historico(dados_escala, ano, mes):
     """
     Salva uma escala gerada na tabela 'escalas_geradas'.
@@ -386,39 +421,65 @@ def salvar_escala_no_historico(dados_escala, ano, mes):
         try:
             # Pega a lista de matrículas da escala gerada
             matriculas_na_escala = list(dados_escala.keys())
-            
+
             # 1. (Opcional, mas recomendado) Deleta o histórico antigo para este mês/ano/colaboradores
             # para evitar duplicatas se o usuário gerar e salvar várias vezes.
-            delete_query = text("""
+            delete_query = text(
+                """
                 DELETE FROM escalas_geradas 
                 WHERE ano_referencia = :ano AND mes_referencia = :mes AND colaborador_matricula IN :matriculas
-            """)
-            connection.execute(delete_query, {"ano": ano, "mes": mes, "matriculas": matriculas_na_escala})
+            """
+            )
+            connection.execute(
+                delete_query,
+                {"ano": ano, "mes": mes, "matriculas": matriculas_na_escala},
+            )
 
             # 2. Insere os novos registros
-            insert_query = text("""
+            insert_query = text(
+                """
                 INSERT INTO escalas_geradas 
                 (colaborador_matricula, data_turno, mes_referencia, ano_referencia) 
                 VALUES (:matricula, :data_turno, :mes, :ano)
-            """)
-            
+            """
+            )
+
             registros_para_inserir = []
             for matricula, info in dados_escala.items():
-                for dia in info.get('dias', []):
+                for dia in info.get("dias", []):
                     # O 'dia' aqui é um dicionário {'dia': X, 'turno': 'Y'}
-                    data_do_turno = date(ano, mes, dia['dia'])
-                    registros_para_inserir.append({
-                        "matricula": matricula,
-                        "data_turno": data_do_turno.strftime('%Y-%m-%d'),
-                        "mes": mes,
-                        "ano": ano
-                    })
-            
+                    data_do_turno = date(ano, mes, dia["dia"])
+                    registros_para_inserir.append(
+                        {
+                            "matricula": matricula,
+                            "data_turno": data_do_turno.strftime("%Y-%m-%d"),
+                            "mes": mes,
+                            "ano": ano,
+                        }
+                    )
+
             if registros_para_inserir:
                 connection.execute(insert_query, registros_para_inserir)
-            
+
             trans.commit()
             return True, f"Escala de {mes}/{ano} salva com sucesso no histórico."
         except Exception as e:
             trans.rollback()
             return False, f"Erro ao salvar histórico: {e}"
+
+
+def get_distinct_escala_types():
+    """Busca todos os tipos de escala únicos cadastrados para os colaboradores ativos."""
+    if not engine:
+        return []
+    with engine.connect() as connection:
+        query = text(
+            """
+            SELECT DISTINCT escala 
+            FROM colaboradores 
+            WHERE ativo = 1 AND escala IS NOT NULL AND escala != ''
+            ORDER BY escala
+        """
+        )
+        result = connection.execute(query).fetchall()
+        return [row[0] for row in result]

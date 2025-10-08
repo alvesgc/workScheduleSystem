@@ -2,7 +2,6 @@ import customtkinter as ctk
 import os
 
 # --- VARIÁVEIS GLOBAIS PARA GUARDAR AS FONTES ---
-# Começam vazias e serão preenchidas pela função init_fonts
 TEXTO_NORMAL = None
 LABEL_FONT = None
 BUTTON_FONT = None
@@ -11,29 +10,41 @@ SUBTITULO = None
 
 def init_fonts():
     """
-    Esta função deve ser chamada APÓS a janela principal do app ser criada.
-    Ela carrega os arquivos de fonte e cria os objetos CTkFont.
+    Esta função deve ser chamada UMA VEZ no início da aplicação.
+    Ela carrega os arquivos de fonte .ttf/.otf e cria os objetos CTkFont.
     """
     global TEXTO_NORMAL, LABEL_FONT, BUTTON_FONT, TITULO_SECAO, SUBTITULO
 
     try:
-        # Caminhos para os arquivos da fonte
-        font_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets/fonts")
-        poppins_regular = os.path.join(font_path, "Poppins-Regular.ttf")
-        poppins_bold = os.path.join(font_path, "Poppins-Bold.ttf")
+        # Caminho para a pasta de fontes
+        font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts")
+        
+        poppins_regular_path = os.path.join(font_path, "Poppins-Regular.ttf")
+        poppins_bold_path = os.path.join(font_path, "Poppins-Bold.ttf")
 
-        # Definições dos estilos de fonte
-        TEXTO_NORMAL = ctk.CTkFont(family=poppins_regular, size=14)
-        LABEL_FONT = ctk.CTkFont(family=poppins_bold, size=14)
-        BUTTON_FONT = ctk.CTkFont(family=poppins_bold, size=14)
-        TITULO_SECAO = ctk.CTkFont(family=poppins_bold, size=28)
-        SUBTITULO = ctk.CTkFont(family=poppins_regular, size=16)
+        # --- Carregando as fontes Poppins ---
+        ctk.FontManager.load_font(poppins_regular_path)
+        ctk.FontManager.load_font(poppins_bold_path)
+
+        # --- Definições dos estilos de fonte usando os nomes das famílias ---
+        # (Após carregar com FontManager, podemos usar o nome da família da fonte)
+        TEXTO_NORMAL = ctk.CTkFont(family="Poppins", size=14)
+        LABEL_FONT = ctk.CTkFont(family="Poppins Bold", size=14)
+        BUTTON_FONT = ctk.CTkFont(family="Poppins Bold", size=14)
+        TITULO_SECAO = ctk.CTkFont(family="Poppins Bold", size=28)
+        SUBTITULO = ctk.CTkFont(family="Poppins", size=16)
 
         print("Fontes Poppins carregadas com sucesso.")
         return True
 
     except Exception as e:
-        print(f"ERRO: Não foi possível carregar as fontes Poppins: {e}")
+        print(f"ERRO: Não foi possível carregar as fontes: {e}")
         print("Verifique se os arquivos .ttf estão na pasta 'src/geradorEscalas/assets/fonts/'.")
         print("Usando fontes padrão do sistema.")
+        # Define fontes padrão como fallback
+        TEXTO_NORMAL = ctk.CTkFont(size=14)
+        LABEL_FONT = ctk.CTkFont(size=14, weight="bold")
+        BUTTON_FONT = ctk.CTkFont(size=14, weight="bold")
+        TITULO_SECAO = ctk.CTkFont(size=28, weight="bold")
+        SUBTITULO = ctk.CTkFont(size=16)
         return False

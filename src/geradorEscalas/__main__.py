@@ -6,6 +6,8 @@ import bcrypt
 import pandas as pd
 from PIL import Image
 import numpy as np
+from . import fonts 
+import tkfontawesome as fa
 
 # Importa as classes de "view" (que são Frames) e os módulos de apoio
 from .ui.views import (
@@ -72,6 +74,14 @@ class App(ctk.CTk):
 
         fonts.init_fonts()
         
+        try:
+            font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts", "fa-solid.otf")
+            fa.set_font_path(font_path)
+            print("Fonte FontAwesome carregada com sucesso.")
+        except Exception as e:
+            print(f"ERRO: Não foi possível carregar a fonte FontAwesome: {e}")
+            print("Os ícones podem não ser exibidos corretamente.")
+            
         self.title("Acesso ao Sistema")
         self.geometry("400x500") # Tamanho fixo e menor para o login
         self.resizable(False, False) # A tela de login não deve ser redimensionável
