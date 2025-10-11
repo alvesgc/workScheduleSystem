@@ -22,217 +22,85 @@ class GeradorEscalaView(ctk.CTkFrame):
         self.app_controller = app_controller
         self.ultima_escala_gerada = None
 
-        self.escala_filter_vars = {
-            escala: ctk.StringVar(value="on")
-            for escala in db.get_distinct_escala_types()
-        }
-        self.colab_filter_vars = {
-            colab["matricula"]: ctk.StringVar(value="on")
-            for colab in db.get_all_active_collaborators()
-        }
+        # --- Carrega os dados para os filtros ---
+        self.escala_filter_vars = {escala: ctk.StringVar(value="on") for escala in db.get_distinct_escala_types()}
+        all_collaborators = db.get_all_active_collaborators()
+        self.colab_filter_vars = {colab['matricula']: ctk.StringVar(value="on") for colab in all_collaborators}
+        self.colab_matricula_to_name = {colab['matricula']: colab['nome'] for colab in all_collaborators}
+        self.setor_filter_vars = {setor: ctk.StringVar(value="on") for setor in db.get_distinct_setores()}
 
-        self.colab_matricula_to_name = {
-            colab["matricula"]: colab["nome"]
-            for colab in db.get_all_active_collaborators()
-        }
-        self.setor_filter_vars = {
-            setor: ctk.StringVar(value="on") for setor in db.get_distinct_setores()
-        }  # NOVO: Filtro de Setor
-
-        # --- CORREÇÃO: Geração de Ícones com FontAwesome ---
-        self.icons = {}
-        icon_color = "#DCE4EE"  # Cor padrão do texto
+        # --- Ícones ---
+        icon_color = "#DCE4EE"
         icon_size = 16
-
-        icon_map = {
-            "filter": "filter",
-            "users": "users",
-            "generate": "cogs",  # engrenagens, boa alternativa para "gerar"
-            "save": "save",
-            "excel": "file-excel",
-            "pdf": "file-pdf",
+        self.icons = {
+            "filter": fa.icon_to_image("filter", fill=icon_color, scale_to_height=icon_size),
+            "users": fa.icon_to_image("users", fill=icon_color, scale_to_height=icon_size),
+            "generate": fa.icon_to_image("cogs", fill=icon_color, scale_to_height=icon_size),
+            "save": fa.icon_to_image("save", fill=icon_color, scale_to_height=icon_size),
+            "excel": fa.icon_to_image("file-excel", fill=icon_color, scale_to_height=icon_size),
+            "pdf": fa.icon_to_image("file-pdf", fill=icon_color, scale_to_height=icon_size)
         }
-        for name, fa_name in icon_map.items():
-            self.icons[name] = fa.icon_to_image(
-                fa_name, fill=icon_color, scale_to_height=icon_size
-            )
 
         # --- Layout Principal ---
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=1) # Linha da tabela expande
 
         # --- Frame de Controles (Topo) ---
-        controls_frame = ctk.CTkFrame(self)
-        controls_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        controls_frame.grid_columnconfigure(0, weight=1)
-
-        filters_and_period_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        filters_and_period_frame.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        controls_frame = ctk.CTkFrame(self, fg_color="transparent")
+        controls_frame.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="ew")
+        controls_frame.grid_columnconfigure(5, weight=1) # Coluna "vazia" para empurrar o botão Gerar
 
         # Período (Mês e Ano)
-        meses_nomes = [
-            "Janeiro",
-            "Fevereiro",
-            "Março",
-            "Abril",
-            "Maio",
-            "Junho",
-            "Julho",
-            "Agosto",
-            "Setembro",
-            "Outubro",
-            "Novembro",
-            "Dezembro",
-        ]
+        meses_nomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
         self.meses_map = {nome: i + 1 for i, nome in enumerate(meses_nomes)}
         self.mes_var = ctk.StringVar(value=meses_nomes[datetime.now().month - 1])
-        ctk.CTkLabel(filters_and_period_frame, text="Mês:", font=fonts.LABEL_FONT).pack(
-            side="left", padx=(0, 5)
-        )
-        ctk.CTkOptionMenu(
-            filters_and_period_frame,
-            variable=self.mes_var,
-            values=meses_nomes,
-            width=120,
-        ).pack(side="left", padx=(0, 20))
-        ctk.CTkLabel(filters_and_period_frame, text="Ano:", font=fonts.LABEL_FONT).pack(
-            side="left", padx=(0, 5)
-        )
+        ctk.CTkLabel(controls_frame, text="Mês:", font=fonts.LABEL_FONT).grid(row=0, column=0, padx=(10, 5), pady=10)
+        ctk.CTkOptionMenu(controls_frame, variable=self.mes_var, values=meses_nomes, width=120).grid(row=0, column=1, padx=(0, 20))
+        ctk.CTkLabel(controls_frame, text="Ano:", font=fonts.LABEL_FONT).grid(row=0, column=2, padx=(0, 5), pady=10)
         self.ano_var = ctk.StringVar(value=str(datetime.now().year))
-        ctk.CTkEntry(
-            filters_and_period_frame, textvariable=self.ano_var, width=80
-        ).pack(side="left", padx=(0, 20))
+        ctk.CTkEntry(controls_frame, textvariable=self.ano_var, width=80).grid(row=0, column=3, padx=(0, 20))
+        
+        # Frame para os botões de filtro
+        filter_buttons_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        filter_buttons_frame.grid(row=0, column=4, sticky="w")
 
-        # Botões de Filtro com Ícones
-        self.escala_filter_button = ctk.CTkButton(
-            filters_and_period_frame,
-            text="Escalas",
-            image=self.icons.get("filter"),
-            compound="left",
-            command=self._open_escala_filter,
-        )
+        self.escala_filter_button = ctk.CTkButton(filter_buttons_frame, text="Escalas", image=self.icons.get("filter"), compound="left", command=self._open_escala_filter)
         self.escala_filter_button.pack(side="left", padx=5)
-
-        self.setor_filter_button = ctk.CTkButton(
-            filters_and_period_frame,
-            text="Setores",
-            image=self.icons.get("filter"),
-            compound="left",
-            command=self._open_setor_filter,
-        )
+        self.setor_filter_button = ctk.CTkButton(filter_buttons_frame, text="Setores", image=self.icons.get("filter"), compound="left", command=self._open_setor_filter)
         self.setor_filter_button.pack(side="left", padx=5)
-
-        self.colab_filter_button = ctk.CTkButton(
-            filters_and_period_frame,
-            text="Colaboradores",
-            image=self.icons.get("users"),
-            compound="left",
-            command=self._open_colab_filter,
-        )
+        self.colab_filter_button = ctk.CTkButton(filter_buttons_frame, text="Colaboradores", image=self.icons.get("users"), compound="left", command=self._open_colab_filter)
         self.colab_filter_button.pack(side="left", padx=5)
 
-        # Botão de Gerar Prévia com Ícone
-        self.generate_button = ctk.CTkButton(
-            controls_frame,
-            text="Gerar Prévia",
-            image=self.icons.get("generate"),
-            compound="left",
-            font=fonts.BUTTON_FONT,
-            command=self._gerar_previa,
-        )
-        self.generate_button.grid(row=0, column=1, padx=10, pady=10, sticky="e")
+        # Botão de Gerar Prévia
+        self.generate_button = ctk.CTkButton(controls_frame, text="Gerar Prévia", image=self.icons.get("generate"), compound="left", font=fonts.BUTTON_FONT, command=self._gerar_previa)
+        self.generate_button.grid(row=0, column=6, padx=10, pady=10, sticky="e")
 
-        # --- Frame de Ações (Meio) com Ícones ---
-        actions_frame = ctk.CTkFrame(self, fg_color="transparent")
-        actions_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="e")
-
-        self.salvar_button = ctk.CTkButton(
-            actions_frame,
-            text="Salvar",
-            image=self.icons.get("save"),
-            compound="left",
-            state="disabled",
-            command=self._salvar_no_historico,
-        )
-        self.salvar_button.pack(side="left", padx=5)
-
-        self.excel_button = ctk.CTkButton(
-            actions_frame,
-            text="Excel",
-            image=self.icons.get("excel"),
-            compound="left",
-            state="disabled",
-            command=self._exportar_para_excel,
-        )
-        self.excel_button.pack(side="left", padx=5)
-
-        self.pdf_button = ctk.CTkButton(
-            actions_frame,
-            text="PDF",
-            image=self.icons.get("pdf"),
-            compound="left",
-            state="disabled",
-            command=self._exportar_para_pdf,
-        )
-        self.pdf_button.pack(side="left", padx=5)
-
-        # --- Frame da Pré-visualização (Tabela) ---
-        self.preview_frame = ctk.CTkFrame(self)
-        self.preview_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
-        self.preview_frame.grid_rowconfigure(0, weight=1)
-        self.preview_frame.grid_columnconfigure(0, weight=1)
-
-        self.empty_label = ctk.CTkLabel(
-            self.preview_frame,
-            text="Selecione o Mês e Ano e clique em 'Gerar Prévia' para começar.",
-            font=fonts.SUBTITULO,
-            text_color="gray60",
-        )
-        self.empty_label.place(relx=0.5, rely=0.5, anchor="center")
-
-        # Chama a atualização inicial do texto dos botões de filtro
-        self._update_escala_filter_button_text()
-        self._update_setor_filter_button_text()
-        self._update_colab_filter_button_text()
+        # --- Linha Divisória 1 ---
+        ctk.CTkFrame(self, height=1, fg_color="gray30").grid(row=1, column=0, padx=10, pady=5, sticky="ew")
 
         # --- Frame de Ações (Meio) ---
         actions_frame = ctk.CTkFrame(self, fg_color="transparent")
-        actions_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="e")
-        self.salvar_button = ctk.CTkButton(
-            actions_frame,
-            text="Salvar no Histórico",
-            state="disabled",
-            command=self._salvar_no_historico,
-        )
+        actions_frame.grid(row=2, column=0, padx=10, pady=0, sticky="e")
+
+        self.salvar_button = ctk.CTkButton(actions_frame, text="Salvar", image=self.icons.get("save"), compound="left", state="disabled", command=self._salvar_no_historico)
         self.salvar_button.pack(side="left", padx=5)
-        self.excel_button = ctk.CTkButton(
-            actions_frame,
-            text="Exportar para Excel",
-            state="disabled",
-            command=self._exportar_para_excel,
-        )
+        self.excel_button = ctk.CTkButton(actions_frame, text="Excel", image=self.icons.get("excel"), compound="left", state="disabled", command=self._exportar_para_excel)
         self.excel_button.pack(side="left", padx=5)
-        self.pdf_button = ctk.CTkButton(
-            actions_frame,
-            text="Exportar para PDF",
-            state="disabled",
-            command=self._exportar_para_pdf,
-        )
+        self.pdf_button = ctk.CTkButton(actions_frame, text="PDF", image=self.icons.get("pdf"), compound="left", state="disabled", command=self._exportar_para_pdf)
         self.pdf_button.pack(side="left", padx=5)
 
-        # --- Frame da Pré-visualização ---
-        self.preview_frame = ctk.CTkFrame(self)
-        self.preview_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+        # --- Frame da Tabela com Borda ---
+        self.preview_frame = ctk.CTkFrame(self, border_width=1, border_color="gray30")
+        self.preview_frame.grid(row=3, column=0, padx=10, pady=10, sticky="nsew")
         self.preview_frame.grid_rowconfigure(0, weight=1)
         self.preview_frame.grid_columnconfigure(0, weight=1)
 
-        self.empty_label = ctk.CTkLabel(
-            self.preview_frame,
-            text="Selecione o Mês e Ano e clique em 'Gerar Prévia' para começar.",
-            font=fonts.SUBTITULO,
-            text_color="gray60",
-        )
+        self.empty_label = ctk.CTkLabel(self.preview_frame, text="Selecione o Mês e Ano e clique em 'Gerar Prévia' para começar.", font=fonts.SUBTITULO, text_color="gray60")
         self.empty_label.place(relx=0.5, rely=0.5, anchor="center")
+
+        self._update_escala_filter_button_text()
+        self._update_colab_filter_button_text()
+        self._update_setor_filter_button_text()
 
     def _setup_treeview(self):
         """Cria e configura o widget Treeview com todos os estilos necessários."""
@@ -244,26 +112,6 @@ class GeradorEscalaView(ctk.CTkFrame):
             self.preview_frame, columns=colunas, show="headings"
         )
         self.tree.grid(row=0, column=0, sticky="nsew")
-
-        # --- DEFINIÇÃO COMPLETA DE TODAS AS TAGS ---
-        self.tree.tag_configure("turno_D", foreground="#63D471")  # Verde mais vibrante
-        self.tree.tag_configure("turno_N", foreground="#5DADE2")  # Azul mais suave
-        self.tree.tag_configure(
-            "turno_24H", foreground="#EC7063"
-        )  # Vermelho mais suave
-        self.tree.tag_configure(
-            "afastamento", foreground="#F7DC6F"
-        )  # Amarelo mais legível
-
-        # Cores para o FUNDO das linhas
-        self.tree.tag_configure("evenrow", background="#2B2B2B")
-        self.tree.tag_configure("oddrow", background="#242424")
-
-        # Tag para a FONTE em negrito
-        self.tree.tag_configure("critical_escala", font=fonts.LABEL_FONT)
-
-        # Tag especial para texto em itálico de afastamento
-        self.tree.tag_configure("afastamento_font", font=fonts.LABEL_FONT)
 
         self.tree.heading("Colaborador", text="Colaborador", anchor="w")
         self.tree.column(
