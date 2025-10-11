@@ -141,7 +141,7 @@ class MainView(ctk.CTkFrame):
                 ),
             )
             button.configure(**self.style_inactive)
-            
+
             button.grid(row=row, column=0, padx=20, pady=12, sticky="ew")
             self.nav_buttons[name] = button
 
@@ -155,7 +155,7 @@ class MainView(ctk.CTkFrame):
             command=self.logout,
             fg_color="#C43E3E",
             hover_color="#A03030",
-            font=(fonts.BUTTON_FONT)
+            font=(fonts.BUTTON_FONT),
         )
         self.logout_button.grid(row=7, column=0, padx=20, pady=20, sticky="s")
 
@@ -189,10 +189,12 @@ class MainView(ctk.CTkFrame):
         for widget in self.content_frame.winfo_children():
             widget.destroy()
 
-    def _show_content(self, ViewClass, *args, **kwargs):
-        self._clear_content_frame()
-        view = ViewClass(self.content_frame, *args, **kwargs)
-        view.grid(row=0, column=0, sticky="nsew")
+    def _show_content(self, ViewClass, **kwargs):
+        for widget in self.content_frame.winfo_children():
+            widget.destroy()
+            
+        view = ViewClass(self.content_frame, **kwargs)
+        view.pack(expand=True, fill="both")
 
     def show_home_view(self):
         self._show_content(
@@ -219,8 +221,7 @@ class MainView(ctk.CTkFrame):
         """Mostra a tela de cadastro manual, passando a matrícula se estiver em modo de edição."""
         self._show_content(
             CadastroManualView,
-            save_callback=self.app_controller.on_save_colaborador,
-            back_callback=self.show_colaboradores_view,
+            app_controller=self.app_controller,
             matricula_para_editar=matricula_para_editar,
         )
 

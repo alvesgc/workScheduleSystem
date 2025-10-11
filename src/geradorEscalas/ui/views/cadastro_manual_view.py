@@ -1,66 +1,90 @@
+from datetime import datetime
 import customtkinter as ctk
 from tkinter import messagebox
 from ... import fonts
 from ... import database as db
+from ..widgets.ctk_calendar import CTkCalendar
 
 
 class CadastroManualView(ctk.CTkFrame):
-    def __init__(
-        self, master, save_callback, back_callback, matricula_para_editar=None
-    ):
+    def __init__(self, master, app_controller, **kwargs):
         super().__init__(master, fg_color="transparent")
-        self.save_callback = save_callback
-        self.back_callback = back_callback
-        self.matricula_para_editar = matricula_para_editar
 
+        self.app_controller = app_controller
+        self.back_callback = app_controller.show_colaboradores_view
+        self.matricula_para_editar = kwargs.get("matricula_para_editar")
+
+        # --- CORREÇÃO: "Tipo de Turno" renomeado para "Escala" e o antigo "Escala" removido ---
         self.campos = {
             "Nome": ctk.StringVar(),
             "Matrícula": ctk.StringVar(),
             "Cargo": ctk.StringVar(),
             "Setor": ctk.StringVar(),
-            "Escala": ctk.StringVar(),
-            "Tipo de Turno": ctk.StringVar(),
+            "Escala": ctk.StringVar(),  # Este agora é o antigo "Tipo de Turno"
             "Horário Padrão": ctk.StringVar(),
-            "COREN (opcional)": ctk.StringVar(),
-            "Período de Afastamento": ctk.StringVar(),
+            "Conselho (Opcional)": ctk.StringVar(),
+            "Início do Afastamento": ctk.StringVar(),
+            "Fim do Afastamento": ctk.StringVar(),
+            "Motivo do Afastamento": ctk.StringVar(),
         }
+        self._trace_active = True
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        # --- WIDGET DO TÍTULO CRIADO E ARMAZENADO CORRETAMENTE ---
         self.title_label = ctk.CTkLabel(
             self, text="Novo Colaborador", font=fonts.TITULO_SECAO
         )
         self.title_label.grid(row=0, column=0, pady=(0, 20), sticky="w")
 
-        # --- Frame com Rolagem para o Formulário ---
         scrollable_frame = ctk.CTkScrollableFrame(self)
         scrollable_frame.grid(row=1, column=0, sticky="nsew")
         scrollable_frame.grid_columnconfigure(1, weight=1)
 
+        # --- LÓGICA DO LOOP CORRIGIDA ---
         for i, (label, var) in enumerate(self.campos.items()):
             ctk.CTkLabel(
                 scrollable_frame, text=f"{label}:", font=fonts.LABEL_FONT
             ).grid(row=i, column=0, sticky="w", padx=20, pady=10)
 
-            if label == "Escala":
+            entry = None  # Inicializa a variável 'entry'
+
+            if "Afastamento" in label and ("Início" in label or "Fim" in label):
+                date_frame = ctk.CTkFrame(scrollable_frame, fg_color="transparent")
+                date_frame.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
+                date_frame.grid_columnconfigure(0, weight=1)
+                entry = ctk.CTkEntry(
+                    date_frame,
+                    textvariable=var,
+                    height=35,
+                    font=fonts.TEXTO_NORMAL,
+                    placeholder_text="DD/MM/AAAA",
+                )
+                entry.grid(row=0, column=0, sticky="ew")
+                var.trace_add(
+                    "write", lambda name, index, mode, v=var: self._format_date(v)
+                )
+                btn = ctk.CTkButton(
+                    date_frame,
+                    text="...",
+                    width=35,
+                    height=35,
+                    command=lambda v=var: self._open_calendar(v),
+                )
+                btn.grid(row=0, column=1, padx=(5, 0))
+
+            elif label == "Escala":
+                # Este é o antigo "Tipo de Turno", agora com o nome e as opções corretas
                 entry = ctk.CTkComboBox(
                     scrollable_frame,
                     variable=var,
-                    values=["12x36", "Diarista"],
+                    values=["", "Diurno 1", "Diurno 2", "Noturno 1", "Noturno 2"],
+                    height=35,
+                    font=fonts.TEXTO_NORMAL,
                     state="readonly",
-                    height=35,
-                    font=fonts.TEXTO_NORMAL,
                 )
-            elif label == "Tipo de Turno":
-                entry = ctk.CTkComboBox(
-                    scrollable_frame,
-                    variable=var,
-                    values=["Diurno 1", "Diurno 2", "Noturno 1", "Noturno 2", "-"],
-                    height=35,
-                    font=fonts.TEXTO_NORMAL,
-                )
+                entry.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
+
             else:
                 entry = ctk.CTkEntry(
                     scrollable_frame,
@@ -68,12 +92,11 @@ class CadastroManualView(ctk.CTkFrame):
                     height=35,
                     font=fonts.TEXTO_NORMAL,
                 )
+                entry.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
 
-            # Armazena a referência ao entry da matrícula para poder desabilitá-lo
+            # Agora 'entry' sempre existe e podemos referenciá-lo com segurança
             if label == "Matrícula":
                 self.matricula_entry = entry
-
-            entry.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
 
         # --- Botões de Ação ---
         button_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -96,41 +119,74 @@ class CadastroManualView(ctk.CTkFrame):
             font=fonts.BUTTON_FONT,
         ).grid(row=0, column=1, padx=(5, 0), sticky="ew")
 
-        # Se estiver no modo de edição, carrega os dados
         if self.matricula_para_editar:
             self.load_data_for_editing()
 
     def load_data_for_editing(self):
         """Busca os dados do colaborador no BD e preenche o formulário."""
-        # Agora self.title_label existe e pode ser configurado
         self.title_label.configure(text="Editar Colaborador")
-
         data = db.get_collaborator_by_matricula(self.matricula_para_editar)
         if not data:
             messagebox.showerror("Erro", "Colaborador não encontrado.", parent=self)
             self.back_callback()
             return
 
-        # Preenche os campos
+        # Preenche os campos, incluindo os novos de afastamento
         self.campos["Nome"].set(data.get("nome", ""))
         self.campos["Matrícula"].set(data.get("matricula", ""))
         self.campos["Cargo"].set(data.get("cargo", ""))
         self.campos["Setor"].set(data.get("setor", ""))
-        self.campos["Escala"].set(data.get("escala", ""))
-        self.campos["Tipo de Turno"].set(data.get("tipo_turno", ""))
+        self.campos["Escala"].set(data.get("tipo_turno", ""))
         self.campos["Horário Padrão"].set(data.get("horario_padrao", ""))
-        self.campos["COREN (opcional)"].set(data.get("coren", ""))
-        self.campos["Período de Afastamento"].set(data.get("periodo_afastamento", ""))
+        self.campos["Conselho (Opcional)"].set(data.get("conselho", ""))
+        self.campos["Início do Afastamento"].set(
+            str(data.get("afastamento_inicio", ""))
+        )
+        self.campos["Fim do Afastamento"].set(str(data.get("afastamento_fim", "")))
+        self.campos["Motivo do Afastamento"].set(data.get("afastamento_motivo", ""))
 
-        # Desabilita o campo de matrícula para não ser alterado
         self.matricula_entry.configure(state="disabled")
 
-    def _save(self):
-        """Coleta os dados, formata para o BD e chama o callback de salvamento."""
-        dados_para_db = {key: var.get() for key, var in self.campos.items()}
+    def _format_date(self, var):
+        if not self._trace_active:
+            return
+        current_text = var.get()
+        cleaned_text = "".join(filter(str.isdigit, current_text))[:8]
+        formatted_text = ""
+        if len(cleaned_text) > 4:
+            formatted_text = (
+                f"{cleaned_text[:2]}/{cleaned_text[2:4]}/{cleaned_text[4:]}"
+            )
+        elif len(cleaned_text) > 2:
+            formatted_text = f"{cleaned_text[:2]}/{cleaned_text[2:]}"
+        else:
+            formatted_text = cleaned_text
+        self._trace_active = False
+        var.set(formatted_text)
+        self._trace_active = True
 
-        # A validação agora usa as chaves corretas
-        if not dados_para_db["Nome"] or not dados_para_db["Matrícula"]:
+    def _open_calendar(self, string_var_to_update):
+        def update_var_callback(selected_date_obj):
+            string_var_to_update.set(selected_date_obj.strftime("%d/%m/%Y"))
+
+        initial_date = None
+        if string_var_to_update.get():
+            try:
+                initial_date = datetime.strptime(
+                    string_var_to_update.get(), "%d/%m/%Y"
+                ).date()
+            except ValueError:
+                pass
+        CTkCalendar(self, current_date=initial_date, callback=update_var_callback)
+
+
+    def _save(self):
+        """Coleta os dados, valida, mapeia para o formato do BD e chama o callback."""
+        # 1. Coleta os dados brutos da interface do usuário
+        dados_ui = {key: var.get() for key, var in self.campos.items()}
+
+        # 2. Validações principais
+        if not dados_ui["Nome"] or not dados_ui["Matrícula"]:
             messagebox.showwarning(
                 "Campo Obrigatório",
                 "Os campos 'Nome' e 'Matrícula' são obrigatórios.",
@@ -138,7 +194,58 @@ class CadastroManualView(ctk.CTkFrame):
             )
             return
 
-        if "dd/mm/aaaa" in str(dados_para_db["Período de Afastamento"]):
-            dados_para_db["Período de Afastamento"] = ""
-            
-        self.save_callback(dados_para_db, self.matricula_para_editar)
+        inicio_str = dados_ui["Início do Afastamento"]
+        fim_str = dados_ui["Fim do Afastamento"]
+        inicio_date = None
+        fim_date = None
+
+        try:
+            if inicio_str:
+                inicio_date = datetime.strptime(inicio_str, "%d/%m/%Y").date()
+            if fim_str:
+                fim_date = datetime.strptime(fim_str, "%d/%m/%Y").date()
+        except ValueError:
+            messagebox.showerror(
+                "Formato Inválido",
+                "Uma das datas de afastamento está em formato inválido. Use DD/MM/AAAA.",
+                parent=self,
+            )
+            return
+
+        if fim_date and not inicio_date:
+            messagebox.showerror(
+                "Erro de Lógica",
+                "A data de Fim do Afastamento não pode ser preenchida sem uma data de Início.",
+                parent=self,
+            )
+            return
+
+        if inicio_date and fim_date and fim_date < inicio_date:
+            messagebox.showerror(
+                "Erro de Lógica",
+                "A data de Fim do Afastamento não pode ser anterior à data de Início.",
+                parent=self,
+            )
+            return
+
+        dados_mapeados = {
+            "nome": dados_ui.get("Nome"),
+            "matricula": dados_ui.get("Matrícula"),
+            "cargo": dados_ui.get("Cargo"),
+            "setor": dados_ui.get("Setor"),
+            "tipo_turno": dados_ui.get(
+                "Escala"
+            ), 
+            "horario_padrao": dados_ui.get("Horário Padrão"),
+            "conselho": dados_ui.get("Conselho (Opcional)"),
+            "afastamento_inicio": (
+                inicio_date.strftime("%Y-%m-%d") if inicio_date else None
+            ),
+            "afastamento_fim": fim_date.strftime("%Y-%m-%d") if fim_date else None,
+            "afastamento_motivo": dados_ui.get("Motivo do Afastamento"),
+        }
+
+        # 4. Chama a função de callback com os dados já mapeados e prontos para o BD
+        self.app_controller.on_save_colaborador(
+            dados_mapeados, self.matricula_para_editar
+        )

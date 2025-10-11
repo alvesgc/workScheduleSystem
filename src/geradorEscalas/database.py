@@ -76,10 +76,13 @@ def add_colaborador(dados_colaborador):
             sql = text(
                 """
                 INSERT INTO colaboradores 
-                (nome, matricula, cargo, setor, escala, tipo_turno, horario_padrao, coren, ativo) 
-                VALUES (:nome, :matricula, :cargo, :setor, :escala, :tipo_turno, :horario_padrao, :coren, :ativo)
+                (nome, matricula, cargo, setor, escala, tipo_turno, horario_padrao, conselho, 
+                afastamento_inicio, afastamento_fim, afastamento_motivo, ativo) 
+                VALUES (:nome, :matricula, :cargo, :setor, :escala, :tipo_turno, :horario_padrao, :conselho,
+                :afastamento_inicio, :afastamento_fim, :afastamento_motivo, :ativo)
             """
             )
+            # Usa .get() com None como padrão para os campos que podem vir vazios
             params = {
                 "nome": dados_colaborador.get("Nome"),
                 "matricula": dados_colaborador.get("Matrícula"),
@@ -88,7 +91,12 @@ def add_colaborador(dados_colaborador):
                 "escala": dados_colaborador.get("Escala"),
                 "tipo_turno": dados_colaborador.get("Tipo de Turno"),
                 "horario_padrao": dados_colaborador.get("Horário Padrão"),
-                "coren": dados_colaborador.get("COREN (opcional)"),
+                "conselho": dados_colaborador.get("conselho (opcional)"),
+                "afastamento_inicio": dados_colaborador.get("Início do Afastamento")
+                or None,
+                "afastamento_fim": dados_colaborador.get("Fim do Afastamento") or None,
+                "afastamento_motivo": dados_colaborador.get("Motivo do Afastamento")
+                or None,
                 "ativo": True,
             }
             connection.execute(sql, params)
@@ -137,7 +145,7 @@ def get_all_collaborators_dataframe(search_term=None):
 
 
 def get_collaborator_by_matricula(matricula):
-    """Busca os dados de um colaborador específico pela matrícula."""
+    """Busca os dados de um colaborador, incluindo os campos de afastamento."""
     if not engine:
         return None
     with engine.connect() as connection:
@@ -180,16 +188,33 @@ def delete_collaborators_by_matriculas(matriculas):
 
 
 def update_collaborator(matricula, data):
-    """Atualiza os dados de um colaborador existente."""
-    if not engine:
-        return False, "Motor de conexão não está disponível."
+    """Atualiza os dados de um colaborador existente, esperando um dicionário com chaves já mapeadas."""
+    if not engine or not data:
+        return False, "Nenhum dado fornecido para atualização."
+
+    # --- LÓGICA CORRIGIDA E APRIMORADA ---
+
+    # 1. Remove a matrícula do dicionário, pois ela é a chave de busca e não deve ser alterada.
+    data.pop("matricula", None)
+
+    # 2. Cria um dicionário final apenas com os campos que o usuário realmente preencheu (não estão vazios).
+    # Isso evita sobrescrever um campo existente com um valor vazio por engano.
+    dados_finais = {k: v for k, v in data.items() if v is not None and v != ""}
+
+    # 3. Se não houver nada para atualizar, simplesmente retorna sucesso.
+    if not dados_finais:
+        return True, "Nenhuma alteração para salvar."
+
     with engine.connect() as connection:
         trans = connection.begin()
         try:
-            set_clause = ", ".join([f"{key} = :{key}" for key in data.keys()])
+            # 4. Constrói a cláusula SET dinamicamente apenas com os dados que restaram.
+            set_clause = ", ".join([f"{key} = :{key}" for key in dados_finais.keys()])
             query_str = f"UPDATE colaboradores SET {set_clause} WHERE matricula = :original_matricula"
-            params = data
+
+            params = dados_finais
             params["original_matricula"] = matricula
+
             connection.execute(text(query_str), params)
             trans.commit()
             return True, "Colaborador atualizado com sucesso."
@@ -225,42 +250,20 @@ def get_dashboard_stats():
 
 
 def get_upcoming_leaves(days_ahead=30):
-    """Busca afastamentos que começarão nos próximos X dias usando SQLAlchemy."""
-    leaves = []
-    if not engine:
-        return leaves
-
+    """Busca afastamentos que começarão nos próximos X dias a partir de hoje."""
+    if not engine: return []
+    
     with engine.connect() as connection:
-        try:
-            query = text(
-                "SELECT nome, periodo_afastamento FROM colaboradores WHERE periodo_afastamento IS NOT NULL AND periodo_afastamento != '' AND ativo = TRUE"
-            )
-            result = connection.execute(query)
-
-            today = datetime.now()
-            limit_date = today + timedelta(days=days_ahead)
-
-            for row in result:
-                row_dict = row._asdict()
-                try:
-                    start_date_str = row_dict["periodo_afastamento"].split(" a ")[0]
-                    start_date = datetime.strptime(start_date_str, "%d/%m/%Y")
-                    if today <= start_date <= limit_date:
-                        leaves.append(
-                            {
-                                "nome": row_dict["nome"],
-                                "data_inicio": start_date.strftime("%d/%m/%Y"),
-                            }
-                        )
-                except (ValueError, IndexError):
-                    continue
-
-            return sorted(
-                leaves, key=lambda x: datetime.strptime(x["data_inicio"], "%d/%m/%Y")
-            )
-        except Exception as e:
-            print(f"Erro ao buscar próximos afastamentos: {e}")
-            return []
+        query = text("""
+            SELECT nome, afastamento_inicio, afastamento_fim
+            FROM colaboradores
+            WHERE ativo = 1
+            AND afastamento_inicio IS NOT NULL
+            AND afastamento_inicio BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL :days DAY)
+            ORDER BY afastamento_inicio ASC
+        """)
+        result = connection.execute(query, {"days": days_ahead}).fetchall()
+        return [row._asdict() for row in result]
 
 
 def batch_update_collaborators(matriculas, field_to_update, new_value):
@@ -307,25 +310,34 @@ def get_all_active_collaborators(filtros=None):
     Busca colaboradores ativos, aplicando filtros opcionais.
     Filtros é um dicionário: {'escala_types': ['12x36'], 'matriculas': ['123']}
     """
-    if not engine: return []
-    
+    if not engine:
+        return []
+
     params = {}
     query_str = """
-        SELECT matricula, nome, escala, escala_data_base, escala_sequencia_atual
+        SELECT matricula, nome, escala, escala_data_base, escala_sequencia_atual,
+               afastamento_inicio, afastamento_fim
         FROM colaboradores
         WHERE ativo = 1
     """
-
     if filtros:
         if filtros.get("escala_types"):
-            in_placeholders = ', '.join([f':escala_{i}' for i in range(len(filtros["escala_types"]))])
+            in_placeholders = ", ".join(
+                [f":escala_{i}" for i in range(len(filtros["escala_types"]))]
+            )
             query_str += f" AND escala IN ({in_placeholders})"
-            params.update({f'escala_{i}': val for i, val in enumerate(filtros["escala_types"])})
+            params.update(
+                {f"escala_{i}": val for i, val in enumerate(filtros["escala_types"])}
+            )
 
         if filtros.get("matriculas"):
-            in_placeholders = ', '.join([f':mat_{i}' for i in range(len(filtros["matriculas"]))])
+            in_placeholders = ", ".join(
+                [f":mat_{i}" for i in range(len(filtros["matriculas"]))]
+            )
             query_str += f" AND matricula IN ({in_placeholders})"
-            params.update({f'mat_{i}': val for i, val in enumerate(filtros["matriculas"])})
+            params.update(
+                {f"mat_{i}": val for i, val in enumerate(filtros["matriculas"])}
+            )
 
     query_str += " ORDER BY nome"
 

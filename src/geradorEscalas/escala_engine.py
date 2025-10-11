@@ -115,8 +115,23 @@ class GeradorEscalaEngine:
         """
         Recebe uma lista de colaboradores já filtrada e gera a escala para eles.
         """
-        # A busca do banco de dados foi removida daqui
+        primeiro_dia_mes = date(self.ano, self.mes, 1)
+        ultimo_dia_mes = date(self.ano, self.mes, monthrange(self.ano, self.mes)[1])
+
         for colab in colaboradores_filtrados:
+
+            inicio_afast = colab.get("afastamento_inicio")
+            fim_afast = colab.get("afastamento_fim")
+            
+            if inicio_afast and fim_afast:
+                # Verifica se há sobreposição entre o período de afastamento e o mês da escala
+                # A sobreposição ocorre se: (InícioAfast <= FimMês) e (FimAfast >= InícioMês)
+                if inicio_afast <= ultimo_dia_mes and fim_afast >= primeiro_dia_mes:
+                    print(
+                        f"INFO: Colaborador {colab.get('nome')} ignorado por estar afastado no período."
+                    )
+                    continue  # Pula para o próximo colaborador, não gerando escala para este
+                
             matricula = colab.get("matricula")
             tipo_escala = colab.get("escala")
 

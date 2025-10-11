@@ -10,7 +10,7 @@ class HomeView(ctk.CTkFrame):
 
         # --- Carrega os dados do Dashboard ---
         stats = db.get_dashboard_stats()
-        upcoming_leaves = db.get_upcoming_leaves()
+        upcoming_leaves = db.get_upcoming_leaves(days_ahead=30)
 
         # --- Layout do Grid ---
         self.grid_columnconfigure((0, 1), weight=1)
@@ -86,7 +86,7 @@ class HomeView(ctk.CTkFrame):
         info_frame.grid_rowconfigure(0, weight=1)
 
         # Painel da Esquerda: Próximos Afastamentos
-        leaves_panel = ctk.CTkFrame(self)  # Fundo sólido para melhor agrupamento visual
+        leaves_panel = ctk.CTkFrame(self)
         leaves_panel.grid(row=2, column=0, columnspan=2, pady=20, sticky="nsew")
         ctk.CTkLabel(
             leaves_panel, text="Próximos Afastamentos (30 dias)", font=fonts.LABEL_FONT
@@ -97,15 +97,22 @@ class HomeView(ctk.CTkFrame):
 
         if upcoming_leaves:
             for leave in upcoming_leaves:
+                # Formata a data para DD/MM/AAAA para exibição
+                inicio_str = leave["afastamento_inicio"].strftime("%d/%m/%Y")
+                fim_str = (
+                    leave["afastamento_fim"].strftime("%d/%m/%Y")
+                    if leave.get("afastamento_fim")
+                    else "Indefinido"
+                )
+
+                texto = f"• {leave['nome']} (de {inicio_str} a {fim_str})"
                 ctk.CTkLabel(
-                    scrollable_leaves,
-                    text=f"• {leave['nome']} - Início: {leave['data_inicio']}",
-                    font=fonts.TEXTO_NORMAL,
+                    scrollable_leaves, text=texto, font=fonts.TEXTO_NORMAL
                 ).pack(anchor="w", padx=10, pady=2)
         else:
             ctk.CTkLabel(
                 scrollable_leaves,
-                text="Nenhum afastamento programado.",
+                text="Nenhum afastamento programado para os próximos 30 dias.",
                 text_color="gray60",
             ).pack(expand=True)
 

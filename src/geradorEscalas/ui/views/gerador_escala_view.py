@@ -248,6 +248,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             self.preview_frame, columns=colunas, show="headings", style="Treeview"
         )
         self.tree.grid(row=0, column=0, sticky="nsew")
+    
 
         # Tags para colorir o texto dos turnos
         self.tree.tag_configure("turno_D", foreground="#3498DB")  # Azul claro
