@@ -20,8 +20,8 @@ class CadastroManualView(ctk.CTkFrame):
             "Matrícula": ctk.StringVar(),
             "Cargo": ctk.StringVar(),
             "Setor": ctk.StringVar(),
-            "Escala": ctk.StringVar(),  # Este agora é o antigo "Tipo de Turno"
-            "Horário Padrão": ctk.StringVar(),
+            "Tipo de Escala": ctk.StringVar(),  # Para 12x36, Diarista, etc.
+            "Turno Específico": ctk.StringVar(),  # Para Diurno 1, Noturno 2, etc.
             "Conselho (Opcional)": ctk.StringVar(),
             "Início do Afastamento": ctk.StringVar(),
             "Fim do Afastamento": ctk.StringVar(),
@@ -48,7 +48,7 @@ class CadastroManualView(ctk.CTkFrame):
             ).grid(row=i, column=0, sticky="w", padx=20, pady=10)
 
             entry = None  # Inicializa a variável 'entry'
-
+            
             if "Afastamento" in label and ("Início" in label or "Fim" in label):
                 date_frame = ctk.CTkFrame(scrollable_frame, fg_color="transparent")
                 date_frame.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
@@ -73,8 +73,16 @@ class CadastroManualView(ctk.CTkFrame):
                 )
                 btn.grid(row=0, column=1, padx=(5, 0))
 
-            elif label == "Escala":
-                # Este é o antigo "Tipo de Turno", agora com o nome e as opções corretas
+            elif label == "Tipo de Escala":
+                entry = ctk.CTkComboBox(
+                    scrollable_frame,
+                    variable=var,
+                    values=db.get_distinct_escala_types(),
+                    height=35,
+                    font=fonts.TEXTO_NORMAL,
+                )
+
+            elif label == "Turno Específico":
                 entry = ctk.CTkComboBox(
                     scrollable_frame,
                     variable=var,
@@ -83,8 +91,6 @@ class CadastroManualView(ctk.CTkFrame):
                     font=fonts.TEXTO_NORMAL,
                     state="readonly",
                 )
-                entry.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
-
             else:
                 entry = ctk.CTkEntry(
                     scrollable_frame,
@@ -92,9 +98,10 @@ class CadastroManualView(ctk.CTkFrame):
                     height=35,
                     font=fonts.TEXTO_NORMAL,
                 )
+
+            if not ("Afastamento" in label and ("Início" in label or "Fim" in label)):
                 entry.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
 
-            # Agora 'entry' sempre existe e podemos referenciá-lo com segurança
             if label == "Matrícula":
                 self.matricula_entry = entry
 
@@ -136,14 +143,27 @@ class CadastroManualView(ctk.CTkFrame):
         self.campos["Matrícula"].set(data.get("matricula", ""))
         self.campos["Cargo"].set(data.get("cargo", ""))
         self.campos["Setor"].set(data.get("setor", ""))
-        self.campos["Escala"].set(data.get("tipo_turno", ""))
-        self.campos["Horário Padrão"].set(data.get("horario_padrao", ""))
+        self.campos["Tipo de Escala"].set(
+            data.get("escala", "")
+        )  # <-- Campo 'escala' do banco
+        self.campos["Turno Específico"].set(
+            data.get("tipo_turno", "")
+        )  # <-- Campo 'tipo_turno' do banco
         self.campos["Conselho (Opcional)"].set(data.get("conselho", ""))
+
+        inicio_afast = data.get("afastamento_inicio")
+        fim_afast = data.get("afastamento_fim")
+
         self.campos["Início do Afastamento"].set(
-            str(data.get("afastamento_inicio", ""))
+            inicio_afast.strftime("%d/%m/%Y") if inicio_afast else ""
         )
-        self.campos["Fim do Afastamento"].set(str(data.get("afastamento_fim", "")))
+        self.campos["Fim do Afastamento"].set(
+            fim_afast.strftime("%d/%m/%Y") if fim_afast else ""
+        )
+
         self.campos["Motivo do Afastamento"].set(data.get("afastamento_motivo", ""))
+
+        self.matricula_entry.configure(state="disabled")
 
         self.matricula_entry.configure(state="disabled")
 
@@ -178,7 +198,6 @@ class CadastroManualView(ctk.CTkFrame):
             except ValueError:
                 pass
         CTkCalendar(self, current_date=initial_date, callback=update_var_callback)
-
 
     def _save(self):
         """Coleta os dados, valida, mapeia para o formato do BD e chama o callback."""
@@ -233,10 +252,12 @@ class CadastroManualView(ctk.CTkFrame):
             "matricula": dados_ui.get("Matrícula"),
             "cargo": dados_ui.get("Cargo"),
             "setor": dados_ui.get("Setor"),
+            "escala": dados_ui.get(
+                "Tipo de Escala"
+            ),  # UI 'Tipo de Escala' -> DB 'escala'
             "tipo_turno": dados_ui.get(
-                "Escala"
-            ), 
-            "horario_padrao": dados_ui.get("Horário Padrão"),
+                "Turno Específico"
+            ),  # UI 'Turno Específico' -> DB 'tipo_turno'
             "conselho": dados_ui.get("Conselho (Opcional)"),
             "afastamento_inicio": (
                 inicio_date.strftime("%Y-%m-%d") if inicio_date else None

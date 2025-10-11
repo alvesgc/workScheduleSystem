@@ -58,8 +58,7 @@ class EdicaoEmLoteView(ctk.CTkFrame):
             "Cargo": ctk.StringVar(),
             "Setor": ctk.StringVar(),
             "Escala": ctk.StringVar(),
-            "Tipo de Turno": ctk.StringVar(),
-            "Horario Padrao": ctk.StringVar()
+            "Tipo de Turno": ctk.StringVar()
         }
 
         for label, var in self.field_vars.items():

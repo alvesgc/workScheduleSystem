@@ -13,16 +13,104 @@ DB_CONFIG = {
     "database": "gerador_escala_db",
 }
 
-try:
-    # 2. STRING DE CONEXÃO CORRIGIDA PARA USAR AS VARIÁVEIS CERTAS
-    connection_string = (
-        f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}"
-        f"@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
-    )
-    engine = create_engine(connection_string)
-except Exception as e:
-    engine = None
-    print(f"ERRO CRÍTICO: Falha ao criar o motor de conexão com SQLAlchemy: {e}")
+
+def _get_engine():
+    """Cria e retorna o motor de conexão do SQLAlchemy."""
+    try:
+        connection_string = (
+            f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}"
+            f"@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
+        )
+        return create_engine(connection_string)
+    except Exception as e:
+        print(f"ERRO CRÍTICO: Falha ao criar o motor de conexão: {e}")
+        return None
+
+
+def setup_database():
+    """Garante que o banco de dados e todas as tabelas necessárias existam."""
+    try:
+        # 1. Conecta ao MySQL sem especificar o banco de dados
+        db_connection = mysql.connector.connect(
+            host=DB_CONFIG["host"],
+            user=DB_CONFIG["user"],
+            password=DB_CONFIG["password"],
+            port=DB_CONFIG["port"],
+        )
+        cursor = db_connection.cursor()
+
+        # 2. Cria o banco de dados se ele não existir
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_CONFIG['database']}")
+        print(
+            f"Banco de dados '{DB_CONFIG['database']}' verificado/criado com sucesso."
+        )
+
+        cursor.close()
+        db_connection.close()
+
+        # 3. Agora conecta ao banco específico para criar as tabelas
+        engine = _get_engine()
+        with engine.connect() as connection:
+            trans = connection.begin()
+
+            # --- Definição das Tabelas ---
+            tabela_usuarios = """
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(100) NOT NULL UNIQUE,
+                password_hash VARCHAR(255) NOT NULL,
+                role VARCHAR(50) NOT NULL,
+                foto_path VARCHAR(255) NULL
+            );"""
+
+            tabela_colaboradores = """
+            CREATE TABLE IF NOT EXISTS colaboradores (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                nome VARCHAR(255) NOT NULL,
+                matricula VARCHAR(50) NOT NULL UNIQUE,
+                cargo VARCHAR(100),
+                setor VARCHAR(100),
+                escala VARCHAR(50),
+                tipo_turno VARCHAR(50),
+                conselho VARCHAR(50),
+                ativo BOOLEAN DEFAULT TRUE,
+                escala_data_base DATE NULL DEFAULT NULL,
+                escala_sequencia_atual VARCHAR(10) DEFAULT 'IMPAR',
+                afastamento_inicio DATE NULL DEFAULT NULL,
+                afastamento_fim DATE NULL DEFAULT NULL,
+                afastamento_motivo VARCHAR(255)
+            );"""
+
+            tabela_escalas_geradas = """
+            CREATE TABLE IF NOT EXISTS escalas_geradas (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                colaborador_matricula VARCHAR(50) NOT NULL,
+                data_turno DATE NOT NULL,
+                hora_inicio TIME NULL,
+                hora_fim TIME NULL,
+                mes_referencia INT NOT NULL,
+                ano_referencia INT NOT NULL,
+                data_geracao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_colaborador_data (colaborador_matricula, ano_referencia, mes_referencia),
+                FOREIGN KEY (colaborador_matricula) REFERENCES colaboradores(matricula) ON DELETE CASCADE
+            );"""
+
+            # Executa a criação das tabelas
+            connection.execute(text(tabela_usuarios))
+            connection.execute(text(tabela_colaboradores))
+            connection.execute(text(tabela_escalas_geradas))
+
+            trans.commit()
+            print("Tabelas verificadas/criadas com sucesso.")
+
+    except Exception as e:
+        print(f"ERRO CRÍTICO no setup do banco de dados: {e}")
+        return None
+
+
+# --- Executa o setup e cria o motor principal ---
+setup_database()
+engine = _get_engine()
 
 
 def get_user_by_username(username):
@@ -76,9 +164,9 @@ def add_colaborador(dados_colaborador):
             sql = text(
                 """
                 INSERT INTO colaboradores 
-                (nome, matricula, cargo, setor, escala, tipo_turno, horario_padrao, conselho, 
+                (nome, matricula, cargo, setor, escala, tipo_turno, conselho, 
                 afastamento_inicio, afastamento_fim, afastamento_motivo, ativo) 
-                VALUES (:nome, :matricula, :cargo, :setor, :escala, :tipo_turno, :horario_padrao, :conselho,
+                VALUES (:nome, :matricula, :cargo, :setor, :escala, :tipo_turno,:conselho,
                 :afastamento_inicio, :afastamento_fim, :afastamento_motivo, :ativo)
             """
             )
@@ -90,7 +178,6 @@ def add_colaborador(dados_colaborador):
                 "setor": dados_colaborador.get("Setor"),
                 "escala": dados_colaborador.get("Escala"),
                 "tipo_turno": dados_colaborador.get("Tipo de Turno"),
-                "horario_padrao": dados_colaborador.get("Horário Padrão"),
                 "conselho": dados_colaborador.get("conselho (opcional)"),
                 "afastamento_inicio": dados_colaborador.get("Início do Afastamento")
                 or None,
@@ -188,31 +275,28 @@ def delete_collaborators_by_matriculas(matriculas):
 
 
 def update_collaborator(matricula, data):
-    """Atualiza os dados de um colaborador existente, esperando um dicionário com chaves já mapeadas."""
+    """Atualiza os dados de um colaborador existente."""
     if not engine or not data:
         return False, "Nenhum dado fornecido para atualização."
 
-    # --- LÓGICA CORRIGIDA E APRIMORADA ---
+    # --- LÓGICA CORRIGIDA ---
 
-    # 1. Remove a matrícula do dicionário, pois ela é a chave de busca e não deve ser alterada.
+    # 1. Remove a matrícula do dicionário de dados, pois ela é a chave de busca.
     data.pop("matricula", None)
 
-    # 2. Cria um dicionário final apenas com os campos que o usuário realmente preencheu (não estão vazios).
-    # Isso evita sobrescrever um campo existente com um valor vazio por engano.
-    dados_finais = {k: v for k, v in data.items() if v is not None and v != ""}
-
-    # 3. Se não houver nada para atualizar, simplesmente retorna sucesso.
-    if not dados_finais:
+    # 2. Se não houver mais nada para atualizar, retorna.
+    if not data:
         return True, "Nenhuma alteração para salvar."
 
     with engine.connect() as connection:
         trans = connection.begin()
         try:
-            # 4. Constrói a cláusula SET dinamicamente apenas com os dados que restaram.
-            set_clause = ", ".join([f"{key} = :{key}" for key in dados_finais.keys()])
+            # 3. Constrói a cláusula SET dinamicamente com TODOS os dados recebidos.
+            # Agora, se um campo for None (ex: afastamento_inicio), ele será SETado para NULL no banco.
+            set_clause = ", ".join([f"{key} = :{key}" for key in data.keys()])
             query_str = f"UPDATE colaboradores SET {set_clause} WHERE matricula = :original_matricula"
 
-            params = dados_finais
+            params = data  # Usa o dicionário 'data' diretamente
             params["original_matricula"] = matricula
 
             connection.execute(text(query_str), params)
@@ -251,17 +335,20 @@ def get_dashboard_stats():
 
 def get_upcoming_leaves(days_ahead=30):
     """Busca afastamentos que começarão nos próximos X dias a partir de hoje."""
-    if not engine: return []
-    
+    if not engine:
+        return []
+
     with engine.connect() as connection:
-        query = text("""
+        query = text(
+            """
             SELECT nome, afastamento_inicio, afastamento_fim
             FROM colaboradores
             WHERE ativo = 1
             AND afastamento_inicio IS NOT NULL
             AND afastamento_inicio BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL :days DAY)
             ORDER BY afastamento_inicio ASC
-        """)
+        """
+        )
         result = connection.execute(query, {"days": days_ahead}).fetchall()
         return [row._asdict() for row in result]
 
@@ -271,7 +358,7 @@ def batch_update_collaborators(matriculas, field_to_update, new_value):
     if not engine or not matriculas:
         return False, "Nenhum colaborador selecionado para atualização."
 
-    allowed_fields = ["cargo", "setor", "escala", "tipo_turno", "horario_padrao"]
+    allowed_fields = ["cargo", "setor", "escala", "tipo_turno"]
     if field_to_update.lower() not in allowed_fields:
         return (
             False,
