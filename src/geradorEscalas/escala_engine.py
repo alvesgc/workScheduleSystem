@@ -113,43 +113,48 @@ class GeradorEscalaEngine:
     # --- Método Principal (O Roteador) ---
     def executar(self, colaboradores_filtrados):
         """
-        Recebe uma lista de colaboradores já filtrada e gera a escala para eles.
+        Gera a escala para os colaboradores filtrados e adiciona uma flag
+        nos turnos que caem em períodos de afastamento.
         """
         primeiro_dia_mes = date(self.ano, self.mes, 1)
         ultimo_dia_mes = date(self.ano, self.mes, monthrange(self.ano, self.mes)[1])
 
         for colab in colaboradores_filtrados:
-
-            inicio_afast = colab.get("afastamento_inicio")
-            fim_afast = colab.get("afastamento_fim")
-            
-            if inicio_afast and fim_afast:
-                # Verifica se há sobreposição entre o período de afastamento e o mês da escala
-                # A sobreposição ocorre se: (InícioAfast <= FimMês) e (FimAfast >= InícioMês)
-                if inicio_afast <= ultimo_dia_mes and fim_afast >= primeiro_dia_mes:
-                    print(
-                        f"INFO: Colaborador {colab.get('nome')} ignorado por estar afastado no período."
-                    )
-                    continue  # Pula para o próximo colaborador, não gerando escala para este
-                
             matricula = colab.get("matricula")
             tipo_escala = colab.get("escala")
 
-            dias_de_trabalho = []
+            dias_de_trabalho_calculados = []
 
-            # --- O ROTEADOR DE ESCALAS ---
+            # --- ROTEADOR DE ESCALAS (sem alterações) ---
             if tipo_escala == "12x36":
-                dias_de_trabalho = self._calcular_escala_12x36(colab)
+                dias_de_trabalho_calculados = self._calcular_escala_12x36(colab)
             elif tipo_escala == "24x72":
-                dias_de_trabalho = self._calcular_escala_24x72(colab)
+                dias_de_trabalho_calculados = self._calcular_escala_24x72(colab)
             elif tipo_escala == "24x120":
-                dias_de_trabalho = self._calcular_escala_24x120(colab)
+                dias_de_trabalho_calculados = self._calcular_escala_24x120(colab)
             elif tipo_escala == "Diarista":
-                dias_de_trabalho = self._calcular_diarista(colab)
+                dias_de_trabalho_calculados = self._calcular_diarista(colab)
+
+            # --- NOVA LÓGICA DE VERIFICAÇÃO DE AFASTAMENTO ---
+            inicio_afast = colab.get("afastamento_inicio")
+            fim_afast = colab.get("afastamento_fim")
+
+            dias_de_trabalho_final = []
+            for turno in dias_de_trabalho_calculados:
+                dia_do_turno = turno["dia"]
+                data_do_turno = date(self.ano, self.mes, dia_do_turno)
+
+                # Adiciona a nova flag 'em_afastamento'
+                turno["em_afastamento"] = False
+                if inicio_afast and fim_afast:
+                    if inicio_afast <= data_do_turno <= fim_afast:
+                        turno["em_afastamento"] = True
+
+                dias_de_trabalho_final.append(turno)
 
             self.escala_gerada[matricula] = {
                 "nome": colab.get("nome"),
-                "dias": dias_de_trabalho,
+                "dias": dias_de_trabalho_final,
             }
 
         return self.escala_gerada

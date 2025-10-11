@@ -3,6 +3,7 @@ import re
 import shutil
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
+from tkinter import ttk
 import bcrypt
 import pandas as pd
 from PIL import Image
@@ -90,8 +91,10 @@ def run_save_colaborador(dados_colaborador):
 # --- CONTROLADOR PRINCIPAL / JANELA DA APLICAÇÃO ---
 class App(ctk.CTk):
     def __init__(self):
-        super().__init__()
-
+        super().__init__()   
+             
+        style = ttk.Style()
+        style.theme_use("clam")
         fonts.init_fonts()
 
         try:
@@ -165,16 +168,6 @@ class App(ctk.CTk):
             login_callback=self.on_login,
             register_callback=self.show_registration_view,
         )
-
-    def _show_view(self, ViewClass, *args, **kwargs):
-        """Método centralizado para limpar a janela e exibir uma nova view."""
-        if self.current_view:
-            self.current_view.destroy()
-
-        kwargs["app_controller"] = self
-
-        self.current_view = ViewClass(self, *args, **kwargs)
-        self.current_view.pack(expand=True, fill="both")
 
     def _show_view(self, ViewClass, *args, **kwargs):
         if self.current_view:
