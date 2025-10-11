@@ -87,6 +87,7 @@ def run_import_colaboradores(parent_window):
 def run_save_colaborador(dados_colaborador):
     pass
 
+APP_VERSION = "1.0.0"
 
 # --- CONTROLADOR PRINCIPAL / JANELA DA APLICAÇÃO ---
 class App(ctk.CTk):
@@ -143,10 +144,13 @@ class App(ctk.CTk):
             )
 
     def show_main_view(self):
-        self.title("Gerador de Escalas - Painel Principal")
+        self.title(f"Gerador de Escalas - Painel Principal - v{APP_VERSION}")
         if self.current_user_info:
             self._show_view(
-                MainView, app_controller=self, user_data=self.current_user_info
+                MainView, 
+                app_controller=self, 
+                user_data=self.current_user_info,
+                app_version=APP_VERSION # <-- Passa a versão para a MainView
             )
         else:
             messagebox.showerror(

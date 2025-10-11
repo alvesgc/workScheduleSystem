@@ -13,7 +13,7 @@ from .gerador_escala_view import GeradorEscalaView
 
 
 class MainView(ctk.CTkFrame):
-    def __init__(self, master, app_controller, user_data):
+    def __init__(self, master, app_controller, user_data, app_version):
         super().__init__(master, fg_color="#242424")
         self.app_controller = app_controller
         self.sidebar_expanded = True
@@ -27,7 +27,7 @@ class MainView(ctk.CTkFrame):
         # --- Sidebar ---
         self.sidebar_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#2B2B2B")
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(6, weight=1)
+        self.sidebar_frame.grid_rowconfigure(5, weight=1) 
 
         # --- Ícones ---
         icon_color = "#E0E0E0"
@@ -144,20 +144,21 @@ class MainView(ctk.CTkFrame):
 
             button.grid(row=row, column=0, padx=20, pady=12, sticky="ew")
             self.nav_buttons[name] = button
-
+            
+        footer_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        # A linha 6 agora tem o peso, empurrando este frame inteiro para baixo
+        footer_frame.grid(row=6, column=0, sticky="sew", padx=10, pady=10)
+        footer_frame.grid_columnconfigure(0, weight=1)
+    
         # --- Botão de Sair ---
         self.logout_button = ctk.CTkButton(
-            self.sidebar_frame,
-            text="  Sair",  # <-- Adicione os espaços aqui
-            image=self.icons["logout"],
-            compound="left",
-            anchor="w",
-            command=self.logout,
-            fg_color="#C43E3E",
-            hover_color="#A03030",
-            font=fonts.BUTTON_FONT,
+            footer_frame, text="  Sair", image=self.icons["logout"],
+            compound="left", anchor="w", command=self.logout,
+            fg_color="#C43E3E", hover_color="#A03030",
+            font=fonts.BUTTON_FONT
         )
-        self.logout_button.grid(row=7, column=0, padx=20, pady=20, sticky="s")
+        self.logout_button.grid(row=0, column=0, padx=10, pady=(0, 10), sticky="ew")
+
 
         # --- Área de Conteúdo ---
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -170,6 +171,11 @@ class MainView(ctk.CTkFrame):
 
         # Inicia a aplicação
         self._navigate(self.show_home_view, "home")
+        
+        footer_text = f"Desenvolvido por NetCode\nVersão {app_version}"
+        footer_label = ctk.CTkLabel(footer_frame, text=footer_text, 
+                                    font=("", 10), text_color="gray50")
+        footer_label.grid(row=1, column=0, padx=10, pady=0, sticky="s")
 
     def _navigate(self, command, button_name):
         command()
