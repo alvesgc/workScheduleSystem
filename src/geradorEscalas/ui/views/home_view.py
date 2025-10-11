@@ -1,20 +1,17 @@
 import customtkinter as ctk
+import tkfontawesome as fa
 from ... import database as db
 from ... import fonts
-import tkfontawesome as fa
 
 
 class HomeView(ctk.CTkFrame):
-    def __init__(self, master, gerar_escala_callback, gerenciar_colaboradores_callback):
+    def __init__(self, master, app_controller, main_view, **kwargs):
         super().__init__(master, fg_color="transparent")
+        self.app_controller = app_controller
 
         # --- Carrega os dados do Dashboard ---
         stats = db.get_dashboard_stats()
-        upcoming_leaves = db.get_upcoming_leaves(days_ahead=30)
-
-        # --- Layout do Grid ---
-        self.grid_columnconfigure((0, 1), weight=1)
-        self.grid_rowconfigure(2, weight=1)  # Linha dos painéis de info expande
+        upcoming_leaves = db.get_upcoming_leaves()
 
         # --- Ícones para o Dashboard ---
         icon_color = "#DCE4EE"
@@ -32,6 +29,10 @@ class HomeView(ctk.CTkFrame):
             "user-cog", fill=icon_color, scale_to_height=20
         )
 
+        # --- Layout do Grid ---
+        self.grid_columnconfigure((0, 1), weight=1)
+        self.grid_rowconfigure(2, weight=1)
+
         # --- Cabeçalho ---
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
         header_frame.grid(row=0, column=0, columnspan=2, pady=(0, 20), sticky="ew")
@@ -44,6 +45,7 @@ class HomeView(ctk.CTkFrame):
             header_frame,
             text="Este é o seu painel de controle com informações importantes do sistema.",
             font=fonts.SUBTITULO,
+            text_color="gray60",
         ).pack(anchor="w")
 
         # --- Cards de Estatísticas ---
@@ -51,10 +53,9 @@ class HomeView(ctk.CTkFrame):
         stats_frame.grid(row=1, column=0, columnspan=2, pady=10, sticky="ew")
         stats_frame.grid_columnconfigure((0, 1), weight=1)
 
-        # Card 1: Colaboradores Ativos
         card1 = ctk.CTkFrame(stats_frame)
         card1.grid(row=0, column=0, padx=(0, 10), sticky="ew")
-        card1.grid_columnconfigure(1, weight=1)  # Faz a coluna do texto expandir
+        card1.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(card1, text="", image=self.icon_users).grid(
             row=0, column=0, rowspan=2, padx=20, pady=20
         )
@@ -65,7 +66,6 @@ class HomeView(ctk.CTkFrame):
             row=1, column=1, sticky="nw"
         )
 
-        # Card 2: Setores Gerenciados
         card2 = ctk.CTkFrame(stats_frame)
         card2.grid(row=0, column=1, padx=(10, 0), sticky="ew")
         card2.grid_columnconfigure(1, weight=1)
@@ -79,13 +79,7 @@ class HomeView(ctk.CTkFrame):
             row=1, column=1, sticky="nw"
         )
 
-        # --- Painéis de Informação ---
-        info_frame = ctk.CTkFrame(self, fg_color="transparent")
-        info_frame.grid(row=2, column=0, columnspan=2, pady=20, sticky="nsew")
-        info_frame.grid_columnconfigure(0, weight=1)
-        info_frame.grid_rowconfigure(0, weight=1)
-
-        # Painel da Esquerda: Próximos Afastamentos
+        # --- Painel de Próximos Afastamentos ---
         leaves_panel = ctk.CTkFrame(self)
         leaves_panel.grid(row=2, column=0, columnspan=2, pady=20, sticky="nsew")
         ctk.CTkLabel(
@@ -93,18 +87,16 @@ class HomeView(ctk.CTkFrame):
         ).pack(pady=10, padx=20, anchor="w")
 
         scrollable_leaves = ctk.CTkScrollableFrame(leaves_panel, fg_color="transparent")
-        scrollable_leaves.pack(fill="both", expand=True, padx=5)
+        scrollable_leaves.pack(fill="both", expand=True, padx=15, pady=(0, 15))
 
         if upcoming_leaves:
             for leave in upcoming_leaves:
-                # Formata a data para DD/MM/AAAA para exibição
                 inicio_str = leave["afastamento_inicio"].strftime("%d/%m/%Y")
                 fim_str = (
                     leave["afastamento_fim"].strftime("%d/%m/%Y")
                     if leave.get("afastamento_fim")
                     else "Indefinido"
                 )
-
                 texto = f"• {leave['nome']} (de {inicio_str} a {fim_str})"
                 ctk.CTkLabel(
                     scrollable_leaves, text=texto, font=fonts.TEXTO_NORMAL
@@ -121,10 +113,12 @@ class HomeView(ctk.CTkFrame):
         action_frame.grid(row=3, column=0, columnspan=2, pady=10, sticky="ew")
         action_frame.grid_columnconfigure((0, 1), weight=1)
 
+        # --- 2. COMANDOS DOS BOTÕES CORRIGIDOS ---
         ctk.CTkButton(
             action_frame,
             text="Gerar Nova Escala",
-            command=gerar_escala_callback,
+            image=self.icon_calendar,
+            command=lambda: main_view._navigate(main_view.show_escala_wizard, "escala"),
             height=50,
             font=fonts.BUTTON_FONT,
         ).grid(row=0, column=0, padx=(0, 10), sticky="ew")
@@ -132,7 +126,12 @@ class HomeView(ctk.CTkFrame):
         ctk.CTkButton(
             action_frame,
             text="Gerenciar Colaboradores",
-            command=gerenciar_colaboradores_callback,
+            image=self.icon_user_cog,
+            command=lambda: main_view._navigate(
+                main_view.show_colaboradores_view, "colaboradores"
+            ),
             height=50,
             font=fonts.BUTTON_FONT,
+            fg_color="#4A4A4A",
+            hover_color="#3A3A3A",
         ).grid(row=0, column=1, padx=(10, 0), sticky="ew")

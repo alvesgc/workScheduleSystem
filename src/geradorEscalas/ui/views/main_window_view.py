@@ -198,9 +198,9 @@ class MainView(ctk.CTkFrame):
 
     def show_home_view(self):
         self._show_content(
-            HomeView,
-            gerar_escala_callback=self.show_escala_wizard,
-            gerenciar_colaboradores_callback=self.show_colaboradores_view,
+            HomeView, 
+            app_controller=self.app_controller, # <-- Argumento que faltava
+            main_view=self
         )
 
     def show_escala_wizard(self):
