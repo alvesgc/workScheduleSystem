@@ -117,11 +117,11 @@ class MainView(ctk.CTkFrame):
         self.style_active = {"fg_color": "#1F6AA5", "hover_color": "#1F6AA5"}
 
         button_info = [
-            ("home", "Início", "home", self.show_home_view, 2),
-            ("escala", "Gerar Escala", "calendar", self.show_escala_wizard, 3),
+            ("home", "  Início", "home", self.show_home_view, 2),
+            ("escala", "  Gerar Escala", "calendar", self.show_escala_wizard, 3),
             (
                 "colaboradores",
-                "Colaboradores",
+                "  Colaboradores",
                 "users",
                 self.show_colaboradores_view,
                 4,
@@ -148,14 +148,14 @@ class MainView(ctk.CTkFrame):
         # --- Botão de Sair ---
         self.logout_button = ctk.CTkButton(
             self.sidebar_frame,
-            text="Sair",
+            text="  Sair",  # <-- Adicione os espaços aqui
             image=self.icons["logout"],
             compound="left",
             anchor="w",
             command=self.logout,
             fg_color="#C43E3E",
             hover_color="#A03030",
-            font=(fonts.BUTTON_FONT),
+            font=fonts.BUTTON_FONT,
         )
         self.logout_button.grid(row=7, column=0, padx=20, pady=20, sticky="s")
 
@@ -192,15 +192,15 @@ class MainView(ctk.CTkFrame):
     def _show_content(self, ViewClass, **kwargs):
         for widget in self.content_frame.winfo_children():
             widget.destroy()
-            
+
         view = ViewClass(self.content_frame, **kwargs)
         view.pack(expand=True, fill="both")
 
     def show_home_view(self):
         self._show_content(
-            HomeView, 
-            app_controller=self.app_controller, # <-- Argumento que faltava
-            main_view=self
+            HomeView,
+            app_controller=self.app_controller,  # <-- Argumento que faltava
+            main_view=self,
         )
 
     def show_escala_wizard(self):

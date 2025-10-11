@@ -68,11 +68,11 @@ class GeradorEscalaView(ctk.CTkFrame):
         # Botões de Filtro
         filter_buttons_frame = ctk.CTkFrame(inner_controls_frame, fg_color="transparent")
         filter_buttons_frame.grid(row=0, column=4, sticky="w")
-        self.escala_filter_button = ctk.CTkButton(filter_buttons_frame, text="Escalas", image=self.icons.get("filter"), compound="left", command=self._open_escala_filter)
+        self.escala_filter_button = ctk.CTkButton(filter_buttons_frame, text="Escalas",font=fonts.BUTTON_FONT, image=self.icons.get("filter"), compound="left", command=self._open_escala_filter)
         self.escala_filter_button.pack(side="left", padx=5)
-        self.setor_filter_button = ctk.CTkButton(filter_buttons_frame, text="Setores", image=self.icons.get("filter"), compound="left", command=self._open_setor_filter)
+        self.setor_filter_button = ctk.CTkButton(filter_buttons_frame, text="Setores",font=fonts.BUTTON_FONT, image=self.icons.get("filter"), compound="left", command=self._open_setor_filter)
         self.setor_filter_button.pack(side="left", padx=5)
-        self.colab_filter_button = ctk.CTkButton(filter_buttons_frame, text="Colaboradores", image=self.icons.get("users"), compound="left", command=self._open_colab_filter)
+        self.colab_filter_button = ctk.CTkButton(filter_buttons_frame, text="Colaboradores",font=fonts.BUTTON_FONT, image=self.icons.get("users"), compound="left", command=self._open_colab_filter)
         self.colab_filter_button.pack(side="left", padx=5)
 
         # Botão Gerar Prévia
@@ -83,11 +83,11 @@ class GeradorEscalaView(ctk.CTkFrame):
         actions_frame = ctk.CTkFrame(self, fg_color="transparent")
         actions_frame.grid(row=1, column=0, padx=10, pady=0, sticky="e")
 
-        self.salvar_button = ctk.CTkButton(actions_frame, text="Salvar", image=self.icons.get("save"), compound="left", state="disabled", command=self._salvar_no_historico)
+        self.salvar_button = ctk.CTkButton(actions_frame, text="Salvar",font=fonts.BUTTON_FONT, image=self.icons.get("save"), compound="left", state="disabled", command=self._salvar_no_historico)
         self.salvar_button.pack(side="left", padx=5)
-        self.excel_button = ctk.CTkButton(actions_frame, text="Excel", image=self.icons.get("excel"), compound="left", state="disabled", command=self._exportar_para_excel)
+        self.excel_button = ctk.CTkButton(actions_frame, text="Excel", font=fonts.BUTTON_FONT,image=self.icons.get("excel"), compound="left", state="disabled", command=self._exportar_para_excel)
         self.excel_button.pack(side="left", padx=5)
-        self.pdf_button = ctk.CTkButton(actions_frame, text="PDF", image=self.icons.get("pdf"), compound="left", state="disabled", command=self._exportar_para_pdf)
+        self.pdf_button = ctk.CTkButton(actions_frame, text="PDF", font=fonts.BUTTON_FONT,image=self.icons.get("pdf"), compound="left", state="disabled", command=self._exportar_para_pdf)
         self.pdf_button.pack(side="left", padx=5)
 
         # --- ESTRUTURA DA TABELA CORRIGIDA ---

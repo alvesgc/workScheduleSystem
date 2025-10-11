@@ -53,16 +53,16 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
         action_buttons_frame.grid(row=0, column=2, sticky="e")
         
         # --- Botões agora usam .grid() em vez de .pack() ---
-        add_button = ctk.CTkButton(action_buttons_frame, text="Adicionar Novo", image=icon_add, compound="left", command=self.app_controller.show_cadastro_manual_view)
+        add_button = ctk.CTkButton(action_buttons_frame, text="Adicionar Novo", font=fonts.BUTTON_FONT, image=icon_add, compound="left", command=self.app_controller.show_cadastro_manual_view)
         add_button.grid(row=0, column=0, padx=5)
 
-        import_button = ctk.CTkButton(action_buttons_frame, text="Importar", image=icon_import, compound="left", fg_color="transparent", border_color="#565B5E", border_width=2, command=self.app_controller.on_import_colaboradores)
+        import_button = ctk.CTkButton(action_buttons_frame, text="Importar", font=fonts.BUTTON_FONT, image=icon_import, compound="left", fg_color="transparent", border_color="#565B5E", border_width=2, command=self.app_controller.on_import_colaboradores)
         import_button.grid(row=0, column=1, padx=5)
 
-        self.edit_button = ctk.CTkButton(action_buttons_frame, text="Editar", image=icon_edit, compound="left", command=self.edit_selected)
+        self.edit_button = ctk.CTkButton(action_buttons_frame, text="Editar", font=fonts.BUTTON_FONT, image=icon_edit, compound="left", command=self.edit_selected)
         self.edit_button.grid(row=0, column=2, padx=5)
 
-        self.delete_button = ctk.CTkButton(action_buttons_frame, text="Excluir", image=icon_delete, compound="left", command=self.delete_selected, fg_color="#D63031", hover_color="#B02020")
+        self.delete_button = ctk.CTkButton(action_buttons_frame, text="Excluir", font=fonts.BUTTON_FONT, image=icon_delete, compound="left", command=self.delete_selected, fg_color="#D63031", hover_color="#B02020")
         self.delete_button.grid(row=0, column=3, padx=5)
 
         filter_frame = ctk.CTkFrame(self, fg_color="transparent")
