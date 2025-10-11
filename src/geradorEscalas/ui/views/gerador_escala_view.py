@@ -129,12 +129,12 @@ class GeradorEscalaView(ctk.CTkFrame):
         # 2. Configura as colunas (isso permanece aqui, pois é específico desta tela)
         self.tree.heading("Colaborador", text="Colaborador", anchor="w")
         self.tree.column(
-            "Colaborador", width=250, minwidth=200, anchor="w", stretch=ctk.NO
+            "Colaborador", width=350, minwidth=250, anchor="w", stretch=ctk.NO
         )
 
         for i in range(1, 32):
             self.tree.heading(str(i), text=str(i))
-            min_width = 70 if i % 7 == 1 and i > 1 else 45
+            min_width = 70 if i % 8 == 1 and i > 1 else 45
             self.tree.column(
                 str(i), width=45, minwidth=min_width, anchor="center", stretch=ctk.NO
             )
