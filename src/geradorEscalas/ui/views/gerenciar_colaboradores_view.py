@@ -66,16 +66,16 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
         self.delete_button.grid(row=0, column=3, padx=5)
 
         filter_frame = ctk.CTkFrame(self, fg_color="transparent")
-        filter_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(5, 10))
+        filter_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(5, 10))
+        filter_frame.grid_columnconfigure(0, weight=1) # Entry de busca expande
         
-        self.search_var = ctk.StringVar()
-        self.search_entry = ctk.CTkEntry(filter_frame, textvariable=self.search_var, placeholder_text="Pesquisar por nome ou matrícula...")
-        self.search_entry.pack(side="left", padx=10, pady=10, fill="x", expand=True)
+        self.search_entry = ctk.CTkEntry(filter_frame, placeholder_text="Pesquisar por nome ou matrícula...", font=fonts.TEXTO_NORMAL, height=35)
+        self.search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         self.search_entry.bind("<Return>", self.perform_search)
         
-        icon_search = fa.icon_to_image("search", fill=icon_color, scale_to_height=16)
-        search_button = ctk.CTkButton(filter_frame, text="", image=icon_search, width=32, command=self.perform_search)
-        search_button.pack(side="left", padx=(0, 10))
+        icon_search = fa.icon_to_image("search", fill="#DCE4EE", scale_to_height=16)
+        # O botão agora tem a mesma altura do campo de busca
+        ctk.CTkButton(filter_frame, text="", image=icon_search, width=35, height=35, command=self.perform_search).grid(row=0, column=1)
 
         # --- Tabela ---
         self.table_frame = ctk.CTkFrame(self, fg_color="#2B2B2B", border_width=1, border_color="gray30")
@@ -124,10 +124,8 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
         
         style.configure("Treeview.Cell", padding=5)
 
-        self.tree = CTkAdvancedTable(self.table_frame, columns=colunas_df, show="headings")
+        self.tree = CTkAdvancedTable(self.table_frame, columns=colunas_df, show_checkbox_column=True)
         self.tree.grid(row=0, column=0, sticky="nsew", padx=1, pady=1) # Pequeno padding interno
-    
-        self.tree['show'] = 'headings'
         
         scrollbar = ctk.CTkScrollbar(self.table_frame, command=self.tree.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
@@ -230,4 +228,5 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             self.app_controller.on_delete_collaborators(matriculas)
 
     def perform_search(self, event=None):
-        self.update_table(self.search_var.get())
+        search_term = self.search_entry.get()
+        self.update_table(search_term=search_term)

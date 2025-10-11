@@ -4,7 +4,7 @@ from ... import fonts  # Importa o módulo de fontes
 
 
 class CTkAdvancedTable(ttk.Treeview):
-    def __init__(self, master, **kwargs):
+    def __init__(self, master, show_checkbox_column=False, **kwargs):
         # --- ESTILIZAÇÃO CENTRALIZADA ---
         style = ttk.Style()
 
@@ -70,13 +70,16 @@ class CTkAdvancedTable(ttk.Treeview):
             foreground=[("selected", "white")],
         )
 
-        if "show" not in kwargs:
-            kwargs["show"] = "tree headings"
-        elif "tree" not in kwargs["show"]:
-            kwargs["show"] += " tree"
+        kwargs['show'] = 'tree headings' if show_checkbox_column else 'headings'
         # Inicializa a classe base Treeview com o estilo
         super().__init__(master, style="Treeview", **kwargs)
 
+        if show_checkbox_column:
+            self.column("#0", width=50, stretch=False, anchor="center")
+            self.heading("#0", text="")
+        else:
+            self.column("#0", width=0, stretch=False)
+            
         # --- TAGS DE ESTILO PADRÃO ---
         # Todas as tabelas que usarem este componente já terão estas tags prontas
         self.tag_configure("evenrow", background="#2B2B2B")

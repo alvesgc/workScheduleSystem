@@ -43,27 +43,31 @@ class GeradorEscalaView(ctk.CTkFrame):
 
         # --- Layout Principal ---
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1) # Linha da tabela expande
+        self.grid_rowconfigure(3, weight=1) # A linha 2 (tabela) expande
 
-        # --- Frame de Controles (Topo) ---
-        controls_frame = ctk.CTkFrame(self, fg_color="transparent")
-        controls_frame.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="ew")
-        controls_frame.grid_columnconfigure(5, weight=1) # Coluna "vazia" para empurrar o botão Gerar
+        # --- Frame de Controles (Topo) com Borda ---
+        controls_frame = ctk.CTkFrame(self, border_width=1, border_color="gray30")
+        controls_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        controls_frame.grid_columnconfigure(1, weight=1) # Coluna "vazia" para empurrar o botão Gerar
+
+        # Frame interno para não ter borda dupla
+        inner_controls_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        inner_controls_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
+        inner_controls_frame.grid_columnconfigure(5, weight=1)
 
         # Período (Mês e Ano)
         meses_nomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
         self.meses_map = {nome: i + 1 for i, nome in enumerate(meses_nomes)}
         self.mes_var = ctk.StringVar(value=meses_nomes[datetime.now().month - 1])
-        ctk.CTkLabel(controls_frame, text="Mês:", font=fonts.LABEL_FONT).grid(row=0, column=0, padx=(10, 5), pady=10)
-        ctk.CTkOptionMenu(controls_frame, variable=self.mes_var, values=meses_nomes, width=120).grid(row=0, column=1, padx=(0, 20))
-        ctk.CTkLabel(controls_frame, text="Ano:", font=fonts.LABEL_FONT).grid(row=0, column=2, padx=(0, 5), pady=10)
+        ctk.CTkLabel(inner_controls_frame, text="Mês:", font=fonts.LABEL_FONT).grid(row=0, column=0, padx=(0, 5), pady=10)
+        ctk.CTkOptionMenu(inner_controls_frame, variable=self.mes_var, values=meses_nomes, width=120).grid(row=0, column=1, padx=(0, 20), pady=10)
+        ctk.CTkLabel(inner_controls_frame, text="Ano:", font=fonts.LABEL_FONT).grid(row=0, column=2, padx=(0, 5), pady=10)
         self.ano_var = ctk.StringVar(value=str(datetime.now().year))
-        ctk.CTkEntry(controls_frame, textvariable=self.ano_var, width=80).grid(row=0, column=3, padx=(0, 20))
-        
-        # Frame para os botões de filtro
-        filter_buttons_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        filter_buttons_frame.grid(row=0, column=4, sticky="w")
+        ctk.CTkEntry(inner_controls_frame, textvariable=self.ano_var, width=80).grid(row=0, column=3, padx=(0, 20), pady=10)
 
+        # Botões de Filtro
+        filter_buttons_frame = ctk.CTkFrame(inner_controls_frame, fg_color="transparent")
+        filter_buttons_frame.grid(row=0, column=4, sticky="w")
         self.escala_filter_button = ctk.CTkButton(filter_buttons_frame, text="Escalas", image=self.icons.get("filter"), compound="left", command=self._open_escala_filter)
         self.escala_filter_button.pack(side="left", padx=5)
         self.setor_filter_button = ctk.CTkButton(filter_buttons_frame, text="Setores", image=self.icons.get("filter"), compound="left", command=self._open_setor_filter)
@@ -71,16 +75,13 @@ class GeradorEscalaView(ctk.CTkFrame):
         self.colab_filter_button = ctk.CTkButton(filter_buttons_frame, text="Colaboradores", image=self.icons.get("users"), compound="left", command=self._open_colab_filter)
         self.colab_filter_button.pack(side="left", padx=5)
 
-        # Botão de Gerar Prévia
-        self.generate_button = ctk.CTkButton(controls_frame, text="Gerar Prévia", image=self.icons.get("generate"), compound="left", font=fonts.BUTTON_FONT, command=self._gerar_previa)
-        self.generate_button.grid(row=0, column=6, padx=10, pady=10, sticky="e")
+        # Botão Gerar Prévia
+        self.generate_button = ctk.CTkButton(inner_controls_frame, text="Gerar Prévia", image=self.icons.get("generate"), compound="left", font=fonts.BUTTON_FONT, command=self._gerar_previa)
+        self.generate_button.grid(row=0, column=6, padx=(20, 0), pady=10, sticky="e")
 
-        # --- Linha Divisória 1 ---
-        ctk.CTkFrame(self, height=1, fg_color="gray30").grid(row=1, column=0, padx=10, pady=5, sticky="ew")
-
-        # --- Frame de Ações (Meio) ---
+        # --- Frame de Ações ---
         actions_frame = ctk.CTkFrame(self, fg_color="transparent")
-        actions_frame.grid(row=2, column=0, padx=10, pady=0, sticky="e")
+        actions_frame.grid(row=1, column=0, padx=10, pady=0, sticky="e")
 
         self.salvar_button = ctk.CTkButton(actions_frame, text="Salvar", image=self.icons.get("save"), compound="left", state="disabled", command=self._salvar_no_historico)
         self.salvar_button.pack(side="left", padx=5)
@@ -89,11 +90,20 @@ class GeradorEscalaView(ctk.CTkFrame):
         self.pdf_button = ctk.CTkButton(actions_frame, text="PDF", image=self.icons.get("pdf"), compound="left", state="disabled", command=self._exportar_para_pdf)
         self.pdf_button.pack(side="left", padx=5)
 
-        # --- Frame da Tabela com Borda ---
-        self.preview_frame = ctk.CTkFrame(self, border_width=1, border_color="gray30")
-        self.preview_frame.grid(row=3, column=0, padx=10, pady=10, sticky="nsew")
+        # --- ESTRUTURA DA TABELA CORRIGIDA ---
+        # 1. Cria um "Container" que terá a borda e nunca será limpo.
+        table_container = ctk.CTkFrame(self, border_width=1, border_color="gray30")
+        table_container.grid(row=3, column=0, padx=10, pady=10, sticky="nsew")
+        table_container.grid_rowconfigure(0, weight=1)
+        table_container.grid_columnconfigure(0, weight=1)
+
+        # 2. O 'preview_frame' agora vive DENTRO do container e não tem borda própria.
+        # É este frame que será limpo e preenchido.
+        self.preview_frame = ctk.CTkFrame(table_container, fg_color="transparent")
+        self.preview_frame.grid(row=0, column=0, sticky="nsew", padx=1, pady=1) # Padding para a borda ser visível
         self.preview_frame.grid_rowconfigure(0, weight=1)
         self.preview_frame.grid_columnconfigure(0, weight=1)
+        # --- FIM DA ESTRUTURA CORRIGIDA ---
 
         self.empty_label = ctk.CTkLabel(self.preview_frame, text="Selecione o Mês e Ano e clique em 'Gerar Prévia' para começar.", font=fonts.SUBTITULO, text_color="gray60")
         self.empty_label.place(relx=0.5, rely=0.5, anchor="center")
@@ -103,26 +113,33 @@ class GeradorEscalaView(ctk.CTkFrame):
         self._update_setor_filter_button_text()
 
     def _setup_treeview(self):
-        """Cria e configura o widget Treeview com todos os estilos necessários."""
+        """
+        Cria a tabela usando o componente CTkAdvancedTable e define
+        as colunas específicas para a tela de geração de escala.
+        """
         for widget in self.preview_frame.winfo_children():
             widget.destroy()
 
         colunas = ["Colaborador"] + [str(i) for i in range(1, 32)]
-        self.tree = CTkAdvancedTable(
-            self.preview_frame, columns=colunas, show="headings"
-        )
+
+        # 1. Cria a tabela usando nosso componente customizado
+        self.tree = CTkAdvancedTable(self.preview_frame, columns=colunas, show_checkbox_column=False)
         self.tree.grid(row=0, column=0, sticky="nsew")
 
+        # 2. Configura as colunas (isso permanece aqui, pois é específico desta tela)
         self.tree.heading("Colaborador", text="Colaborador", anchor="w")
         self.tree.column(
-            "Colaborador", width=400, minwidth=350, anchor="w", stretch=ctk.NO
-        )  # stretch=NO impede o encolhimento
+            "Colaborador", width=250, minwidth=200, anchor="w", stretch=ctk.NO
+        )
+
         for i in range(1, 32):
             self.tree.heading(str(i), text=str(i))
+            min_width = 70 if i % 7 == 1 and i > 1 else 45
             self.tree.column(
-                str(i), width=45, minwidth=45, anchor="center", stretch=ctk.NO
-            )  # stretch=NO
+                str(i), width=45, minwidth=min_width, anchor="center", stretch=ctk.NO
+            )
 
+        # 3. Configura os scrollbars
         vsb = ctk.CTkScrollbar(self.preview_frame, command=self.tree.yview)
         vsb.grid(row=0, column=1, sticky="ns")
         hsb = ctk.CTkScrollbar(
