@@ -11,6 +11,7 @@ from ... import fonts
 from ...escala_engine import GeradorEscalaEngine
 from ... import database as db
 from .setup_escala_view import SetupEscalaView
+from ..widgets.CTkAdvancedTable import CTkAdvancedTable
 
 ChecklistDropdown = checklist.ChecklistDropdown
 
@@ -238,52 +239,49 @@ class GeradorEscalaView(ctk.CTkFrame):
         for widget in self.preview_frame.winfo_children():
             widget.destroy()
 
-        style = ttk.Style()
-        style.configure("Treeview", rowheight=30, fieldbackground="#242424", background="#242424", foreground="white", borderwidth=0)
-        style.layout("Treeview", [('Treeview.treearea', {'sticky': 'nsew'})])
-        style.configure("Treeview.Heading", font=fonts.LABEL_FONT, background="#2B2B2B", foreground="white", padding=5)
-        style.map('Treeview.Heading', background=[('active', '#3A3A3A')])
-        
-        # Devolvendo a cor de seleção azul
-        select_bg_color = ctk.ThemeManager.theme["CTkButton"]["fg_color"][1]
-        style.map('Treeview', background=[('selected', select_bg_color)], foreground=[('selected', 'white')])
-
         colunas = ["Colaborador"] + [str(i) for i in range(1, 32)]
-        self.tree = ttk.Treeview(self.preview_frame, columns=colunas, show="headings", style="Treeview")
+        self.tree = CTkAdvancedTable(
+            self.preview_frame, columns=colunas, show="headings"
+        )
         self.tree.grid(row=0, column=0, sticky="nsew")
 
         # --- DEFINIÇÃO COMPLETA DE TODAS AS TAGS ---
-        # Cores para o TEXTO dos turnos
-        self.tree.tag_configure("turno_D", foreground="#2ECC71")      # Verde
-        self.tree.tag_configure("turno_N", foreground="#3498DB")      # Azul
-        self.tree.tag_configure("turno_24H", foreground="#E74C3C")    # Vermelho
-        self.tree.tag_configure("afastamento", foreground="#F1C40F") # Amarelo e Itálico (a fonte é aplicada na tag de prioridade)
+        self.tree.tag_configure("turno_D", foreground="#63D471")  # Verde mais vibrante
+        self.tree.tag_configure("turno_N", foreground="#5DADE2")  # Azul mais suave
+        self.tree.tag_configure(
+            "turno_24H", foreground="#EC7063"
+        )  # Vermelho mais suave
+        self.tree.tag_configure(
+            "afastamento", foreground="#F7DC6F"
+        )  # Amarelo mais legível
 
         # Cores para o FUNDO das linhas
         self.tree.tag_configure("evenrow", background="#2B2B2B")
         self.tree.tag_configure("oddrow", background="#242424")
-        
+
         # Tag para a FONTE em negrito
         self.tree.tag_configure("critical_escala", font=fonts.LABEL_FONT)
-        
+
         # Tag especial para texto em itálico de afastamento
         self.tree.tag_configure("afastamento_font", font=fonts.LABEL_FONT)
 
-
-        # Configuração das colunas
-        self.tree.heading("Colaborador", text="Colaborador")
-        self.tree.column("Colaborador", width=350, anchor="w")
+        self.tree.heading("Colaborador", text="Colaborador", anchor="w")
+        self.tree.column(
+            "Colaborador", width=400, minwidth=350, anchor="w", stretch=ctk.NO
+        )  # stretch=NO impede o encolhimento
         for i in range(1, 32):
             self.tree.heading(str(i), text=str(i))
-            min_width = 70 if i % 7 == 1 and i > 1 else 45
-            self.tree.column(str(i), width=45, minwidth=min_width, anchor="center")
+            self.tree.column(
+                str(i), width=45, minwidth=45, anchor="center", stretch=ctk.NO
+            )  # stretch=NO
 
         vsb = ctk.CTkScrollbar(self.preview_frame, command=self.tree.yview)
         vsb.grid(row=0, column=1, sticky="ns")
-        hsb = ctk.CTkScrollbar(self.preview_frame, orientation="horizontal", command=self.tree.xview)
+        hsb = ctk.CTkScrollbar(
+            self.preview_frame, orientation="horizontal", command=self.tree.xview
+        )
         hsb.grid(row=1, column=0, sticky="ew")
         self.tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-
 
     def _gerar_previa(self):
         unconfigured = db.get_unconfigured_collaborators()
@@ -470,46 +468,63 @@ class GeradorEscalaView(ctk.CTkFrame):
         row_count = 0
         for matricula, info in dados_escala.items():
             tags_da_linha = []
-            
+
             # 1. Adiciona a tag de cor de fundo (par ou ímpar)
-            tags_da_linha.append('evenrow' if row_count % 2 == 0 else 'oddrow')
-            
+            tags_da_linha.append("evenrow" if row_count % 2 == 0 else "oddrow")
+
             # 2. Determina a tag de cor de TEXTO e FONTE prioritária para a linha inteira
-            tem_afastamento = any(turno.get('em_afastamento') for turno in info.get('dias', []))
-            tem_24h = any(turno['turno'].upper() == '24H' for turno in info.get('dias', []))
-            tem_noturno = any(turno['turno'].upper() == 'N' for turno in info.get('dias', []))
-            tem_diurno = any(turno['turno'].upper() == 'D' for turno in info.get('dias', []))
+            tem_afastamento = any(
+                turno.get("em_afastamento") for turno in info.get("dias", [])
+            )
+            tem_24h = any(
+                turno["turno"].upper() == "24H" for turno in info.get("dias", [])
+            )
+            tem_noturno = any(
+                turno["turno"].upper() == "N" for turno in info.get("dias", [])
+            )
+            tem_diurno = any(
+                turno["turno"].upper() == "D" for turno in info.get("dias", [])
+            )
 
             if tem_afastamento:
-                tags_da_linha.append('afastamento')
-                tags_da_linha.append('afastamento_font') # Adiciona o estilo de fonte itálico
+                tags_da_linha.append("afastamento")
+                tags_da_linha.append(
+                    "afastamento_font"
+                )  # Adiciona o estilo de fonte itálico
             elif tem_24h:
-                tags_da_linha.append('turno_24H')
-                tags_da_linha.append('critical_escala') # Adiciona o estilo de fonte negrito
+                tags_da_linha.append("turno_24H")
+                tags_da_linha.append(
+                    "critical_escala"
+                )  # Adiciona o estilo de fonte negrito
             elif tem_noturno:
-                tags_da_linha.append('turno_N')
+                tags_da_linha.append("turno_N")
             elif tem_diurno:
-                tags_da_linha.append('turno_D')
+                tags_da_linha.append("turno_D")
 
             # Adiciona o negrito para 24h mesmo se houver afastamento (nome fica em negrito)
-            if tem_24h and 'critical_escala' not in tags_da_linha:
-                 tags_da_linha.append('critical_escala')
-            
+            if tem_24h and "critical_escala" not in tags_da_linha:
+                tags_da_linha.append("critical_escala")
+
             # 3. Insere a linha com o nome, aplicando TODAS as tags
-            item_id = self.tree.insert("", "end", values=[info.get("nome", matricula)], tags=tuple(tags_da_linha))
+            item_id = self.tree.insert(
+                "",
+                "end",
+                values=[info.get("nome", matricula)],
+                tags=tuple(tags_da_linha),
+            )
 
             # 4. Preenche as células com o texto dos turnos
             for turno_info in info.get("dias", []):
                 dia = turno_info.get("dia")
                 tipo_turno = turno_info.get("turno", "X").upper()
                 esta_afastado = turno_info.get("em_afastamento", False)
-                
+
                 if dia:
                     valor_celula = f"{tipo_turno}(A)" if esta_afastado else tipo_turno
                     self.tree.set(item_id, column=str(dia), value=valor_celula)
-            
+
             row_count += 1
-            
+
     def _salvar_no_historico(self):
         """Pega a última escala gerada e pede ao controller para salvá-la, com confirmação."""
         if self.ultima_escala_gerada:
