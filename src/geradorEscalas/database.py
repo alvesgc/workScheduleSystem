@@ -425,7 +425,11 @@ def get_all_active_collaborators(filtros=None):
             params.update(
                 {f"mat_{i}": val for i, val in enumerate(filtros["matriculas"])}
             )
-
+            
+        if filtros.get("setores"):
+            in_placeholders = ', '.join([f':setor_{i}' for i in range(len(filtros["setores"]))])
+            query_str += f" AND setor IN ({in_placeholders})"
+            params.update({f'setor_{i}': val for i, val in enumerate(filtros["setores"])})
     query_str += " ORDER BY nome"
 
     with engine.connect() as connection:
@@ -578,6 +582,23 @@ def get_distinct_escala_types():
             FROM colaboradores 
             WHERE ativo = 1 AND escala IS NOT NULL AND escala != ''
             ORDER BY escala
+        """
+        )
+        result = connection.execute(query).fetchall()
+        return [row[0] for row in result]
+
+
+def get_distinct_setores():
+    """Busca todos os setores únicos cadastrados para os colaboradores ativos."""
+    if not engine:
+        return []
+    with engine.connect() as connection:
+        query = text(
+            """
+            SELECT DISTINCT setor 
+            FROM colaboradores 
+            WHERE ativo = 1 AND setor IS NOT NULL AND setor != ''
+            ORDER BY setor
         """
         )
         result = connection.execute(query).fetchall()

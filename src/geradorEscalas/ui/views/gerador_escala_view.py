@@ -31,10 +31,14 @@ class GeradorEscalaView(ctk.CTkFrame):
             colab["matricula"]: ctk.StringVar(value="on")
             for colab in db.get_all_active_collaborators()
         }
+
         self.colab_matricula_to_name = {
             colab["matricula"]: colab["nome"]
             for colab in db.get_all_active_collaborators()
         }
+        self.setor_filter_vars = {
+            setor: ctk.StringVar(value="on") for setor in db.get_distinct_setores()
+        }  # NOVO: Filtro de Setor
 
         # --- CORREÇÃO: Geração de Ícones com FontAwesome ---
         self.icons = {}
@@ -110,6 +114,15 @@ class GeradorEscalaView(ctk.CTkFrame):
         )
         self.escala_filter_button.pack(side="left", padx=5)
 
+        self.setor_filter_button = ctk.CTkButton(
+            filters_and_period_frame,
+            text="Setores",
+            image=self.icons.get("filter"),
+            compound="left",
+            command=self._open_setor_filter,
+        )
+        self.setor_filter_button.pack(side="left", padx=5)
+
         self.colab_filter_button = ctk.CTkButton(
             filters_and_period_frame,
             text="Colaboradores",
@@ -180,6 +193,7 @@ class GeradorEscalaView(ctk.CTkFrame):
 
         # Chama a atualização inicial do texto dos botões de filtro
         self._update_escala_filter_button_text()
+        self._update_setor_filter_button_text()
         self._update_colab_filter_button_text()
 
         # --- Frame de Ações (Meio) ---
@@ -248,7 +262,6 @@ class GeradorEscalaView(ctk.CTkFrame):
             self.preview_frame, columns=colunas, show="headings", style="Treeview"
         )
         self.tree.grid(row=0, column=0, sticky="nsew")
-    
 
         # Tags para colorir o texto dos turnos
         self.tree.tag_configure("turno_D", foreground="#3498DB")  # Azul claro
@@ -312,6 +325,23 @@ class GeradorEscalaView(ctk.CTkFrame):
             self._update_colab_filter_button_text,
         )
 
+    def _open_setor_filter(self):
+        items_for_dropdown = {
+            setor: var for setor, var in self.setor_filter_vars.items()
+        }
+        ChecklistDropdown(
+            self.setor_filter_button,
+            items_for_dropdown,
+            self._update_setor_filter_button_text,
+        )
+
+    def _update_setor_filter_button_text(self):
+        total = len(self.setor_filter_vars)
+        selecionados = sum(
+            1 for var in self.setor_filter_vars.values() if var.get() == "on"
+        )
+        self.setor_filter_button.configure(text=f"Setores ({selecionados}/{total})")
+
     def _update_escala_filter_button_text(self):
         total = len(self.escala_filter_vars)
         selecionados = sum(
@@ -350,7 +380,7 @@ class GeradorEscalaView(ctk.CTkFrame):
 
         try:
             # --- 1. COLETAR FILTROS DA TELA ---
-            filtros = {"escala_types": [], "matriculas": []}
+            filtros = {"escala_types": [], "matriculas": [], "setores": []}
 
             for escala, var in self.escala_filter_vars.items():
                 if var.get() == "on":
@@ -360,6 +390,9 @@ class GeradorEscalaView(ctk.CTkFrame):
                 if var.get() == "on":
                     filtros["matriculas"].append(matricula)
 
+            for setor, var in self.setor_filter_vars.items():
+                if var.get() == "on":
+                    filtros["setores"].append(setor)
             # --- 2. BUSCAR COLABORADORES JÁ FILTRADOS NO BANCO ---
             colaboradores_para_gerar = db.get_all_active_collaborators(filtros=filtros)
 
