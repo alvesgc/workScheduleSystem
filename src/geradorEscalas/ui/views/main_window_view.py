@@ -25,7 +25,7 @@ class MainView(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=1)
 
         # --- Sidebar ---
-        self.sidebar_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#2B2B2B")
+        self.sidebar_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#DCDCDC")
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(5, weight=1) 
 
@@ -113,7 +113,7 @@ class MainView(ctk.CTkFrame):
 
         # --- Dicionário e Estilos para Botões de Navegação ---
         self.nav_buttons = {}
-        self.style_inactive = {"fg_color": "transparent", "hover_color": "#3A3A3A"}
+        self.style_inactive = {"fg_color": "transparent", "hover_color": "#DCDCDC"}
         self.style_active = {"fg_color": "#1F6AA5", "hover_color": "#1F6AA5"}
 
         button_info = [
@@ -172,10 +172,10 @@ class MainView(ctk.CTkFrame):
         # Inicia a aplicação
         self._navigate(self.show_home_view, "home")
         
-        footer_text = f"Desenvolvido por NetCode\nVersão {app_version}"
-        footer_label = ctk.CTkLabel(footer_frame, text=footer_text, 
-                                    font=("", 10), text_color="gray50")
-        footer_label.grid(row=1, column=0, padx=10, pady=0, sticky="s")
+        # footer_text = f"Desenvolvido por NetCode\nVersão {app_version}"
+        # footer_label = ctk.CTkLabel(footer_frame, text=footer_text, 
+        #                             font=("", 10), text_color="gray50")
+        # footer_label.grid(row=1, column=0, padx=10, pady=0, sticky="s")
 
     def _navigate(self, command, button_name):
         command()

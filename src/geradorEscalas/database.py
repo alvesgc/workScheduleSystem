@@ -334,24 +334,22 @@ def get_dashboard_stats():
 
 
 def get_upcoming_leaves(days_ahead=30):
-    """Busca afastamentos que começarão nos próximos X dias a partir de hoje."""
-    if not engine:
-        return []
-
+    """Busca TODOS os afastamentos que começarão nos próximos X dias a partir de hoje."""
+    if not engine: return []
+    
     with engine.connect() as connection:
-        query = text(
-            """
+        query = text("""
             SELECT nome, afastamento_inicio, afastamento_fim
             FROM colaboradores
             WHERE ativo = 1
-            AND afastamento_inicio IS NOT NULL
-            AND afastamento_inicio BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL :days DAY)
+            AND afastamento_inicio IS NOT NULL AND afastamento_fim IS NOT NULL
+            AND afastamento_fim >= CURDATE()
+            AND afastamento_inicio <= DATE_ADD(CURDATE(), INTERVAL :days DAY)
             ORDER BY afastamento_inicio ASC
-        """
-        )
+        """)
+        # Usa .fetchall() para pegar TODAS as linhas, não apenas a primeira
         result = connection.execute(query, {"days": days_ahead}).fetchall()
         return [row._asdict() for row in result]
-
 
 def batch_update_collaborators(matriculas, field_to_update, new_value):
     """Atualiza um campo específico para uma lista de colaboradores de uma só vez."""

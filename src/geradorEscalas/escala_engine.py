@@ -55,59 +55,64 @@ class GeradorEscalaEngine:
     # --- Métodos Específicos para Cada Tipo de Escala ---
 
     def _calcular_escala_12x36(self, colaborador):
-        """Calcula os turnos para a escala 12x36, determinando se é Dia ou Noite."""
         data_base = colaborador.get("escala_data_base")
         if not data_base:
             return []
-
-        turnos_formatados = []
-        for dt_inicio_turno in self._gerar_ciclo(data_base, 12, 36):
-            tipo_turno = "D" if dt_inicio_turno.hour < 12 else "N"
-            turnos_formatados.append({"dia": dt_inicio_turno.day, "turno": tipo_turno})
-        return turnos_formatados
+        turnos = []
+        for dt in self._gerar_ciclo(data_base, 12, 36):
+            turnos.append({"dia": dt.day, "turno": "X"})  # <-- Simplificado para "X"
+        return turnos
 
     def _calcular_escala_24x72(self, colaborador):
-        """Calcula os turnos para a escala 24x72."""
         data_base = colaborador.get("escala_data_base")
         if not data_base:
             return []
-
-        turnos_formatados = []
-        for dt_inicio_turno in self._gerar_ciclo(data_base, 24, 72):
-            turnos_formatados.append({"dia": dt_inicio_turno.day, "turno": "24h"})
-        return turnos_formatados
+        turnos = []
+        for dt in self._gerar_ciclo(data_base, 24, 72):
+            turnos.append({"dia": dt.day, "turno": "X"})  # <-- Simplificado para "X"
+        return turnos
 
     def _calcular_escala_24x120(self, colaborador):
         """
-        Calcula a escala 24x120 (ciclo de 6 dias) e atualiza o estado par/ímpar.
+        Calcula a escala 24x120 com a lógica de alternância de ciclos (par/ímpar).
         """
-        data_base = colaborador.get("escala_data_base")
+        data_base_original = colaborador.get("escala_data_base")
         sequencia_anterior = colaborador.get("escala_sequencia_atual", "IMPAR")
         matricula = colaborador.get("matricula")
-        if not data_base or not matricula:
+        if not data_base_original or not matricula:
             return []
 
-        # --- LÓGICA DO FILTRO REMOVIDA PARA CORRIGIR O BUG ---
-        # Agora, a função simplesmente gera o ciclo de 6 dias.
-        turnos_formatados = []
-        for dt_inicio_turno in self._gerar_ciclo(data_base, 24, 120):
-            turnos_formatados.append({"dia": dt_inicio_turno.day, "turno": "24h"})
-
-        # --- A LÓGICA DE ATUALIZAÇÃO DE ESTADO É MANTIDA ---
-        # Isso garante que a regra de negócio para o próximo mês continue funcionando.
+        # --- LÓGICA CORRIGIDA ---
+        # Determina a sequência para o mês atual, invertendo a anterior
         sequencia_deste_mes = "PAR" if sequencia_anterior == "IMPAR" else "IMPAR"
+
+        # Define a data de início do ciclo para este mês.
+        # Se a regra for PAR, o ciclo começa 24h depois da data base original.
+        data_base_para_este_mes = data_base_original
+        if sequencia_deste_mes == "PAR":
+            data_base_para_este_mes_dt = datetime.combine(
+                data_base_original, datetime.min.time()
+            ) + timedelta(hours=24)
+            data_base_para_este_mes = data_base_para_este_mes_dt.date()
+
+        # Gera o ciclo usando a data base correta (original para ÍMPAR, ajustada para PAR)
+        turnos_formatados = []
+        for dt_inicio_turno in self._gerar_ciclo(data_base_para_este_mes, 24, 120):
+            turnos_formatados.append({"dia": dt_inicio_turno.day, "turno": "X"})
+
+        # Atualiza o estado no banco para a próxima geração
         db.update_sequencia_colaborador(matricula, sequencia_deste_mes)
 
         return turnos_formatados
 
     def _calcular_diarista(self, colaborador):
-        """Calcula os dias de trabalho para um diarista (Seg-Sex)."""
         turnos_formatados = []
         num_dias = monthrange(self.ano, self.mes)[1]
         for dia in range(1, num_dias + 1):
-            # weekday() -> 0=Segunda, 4=Sexta, 5=Sábado, 6=Domingo
             if weekday(self.ano, self.mes, dia) < 5:
-                turnos_formatados.append({"dia": dia, "turno": "D"})
+                turnos_formatados.append(
+                    {"dia": dia, "turno": "X"}
+                )  # <-- Simplificado para "X"
         return turnos_formatados
 
     # --- Método Principal (O Roteador) ---

@@ -47,23 +47,23 @@ class CTkAdvancedTable(ttk.Treeview):
             "Treeview",
             rowheight=30,
             font=fonts.TEXTO_NORMAL,
-            fieldbackground="#242424",
-            background="#242424",
+            fieldbackground="white",
+            background="white",
             foreground="white",
             borderwidth=0,
         )
-        style.layout("Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
         style.configure(
             "Treeview.Heading",
             font=fonts.LABEL_FONT,
-            background="#333333",
-            foreground="#E0E0E0",
+            background="white",
+            foreground="white",
             padding=5,
             borderwidth=0,
         )
+        style.layout("Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
 
         # Mapeia as cores para os estados (hover e selecionado)
-        style.map("Treeview.Heading", background=[("active", "#4A4A4A")])
+        style.map("Treeview.Heading", background=[("active", "#white")])
         style.map(
             "Treeview",
             background=[("selected", select_bg_color)],
@@ -86,10 +86,6 @@ class CTkAdvancedTable(ttk.Treeview):
         self.tag_configure("oddrow", background="#242424")
         self.tag_configure("critical_escala", font=fonts.LABEL_FONT)  # Negrito
 
-        # Tags de Cor de Texto (podem ser usadas conforme a necessidade de cada tela)
-        self.tag_configure("turno_D", foreground="#63D471")  # Verde mais vibrante
-        self.tag_configure("turno_N", foreground="#5DADE2")  # Azul mais suave
-        self.tag_configure("turno_24H", foreground="#EC7063")  # Vermelho mais suave
-        self.tag_configure(
-            "afastamento", foreground="#F7DC6F", font=fonts.LABEL_FONT
-        )  # Amarelo mais legível
+        self.tag_configure("turno_X", foreground="#3C4FFC")     # Verde para Trabalho
+        self.tag_configure("turno_F", foreground="gray50")      # Cinza para Folga
+        self.tag_configure("afastamento", foreground="#F1C40F", font=('Calibri', 9, 'italic')) # Amarelo para Afastamento

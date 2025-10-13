@@ -130,7 +130,7 @@ class CadastroManualView(ctk.CTkFrame):
             self.load_data_for_editing()
 
     def load_data_for_editing(self):
-        """Busca os dados do colaborador no BD e preenche o formulário."""
+        """Busca os dados do colaborador no BD e preenche o formulário, tratando valores nulos."""
         self.title_label.configure(text="Editar Colaborador")
         data = db.get_collaborator_by_matricula(self.matricula_para_editar)
         if not data:
@@ -138,32 +138,21 @@ class CadastroManualView(ctk.CTkFrame):
             self.back_callback()
             return
 
-        # Preenche os campos, incluindo os novos de afastamento
-        self.campos["Nome"].set(data.get("nome", ""))
-        self.campos["Matrícula"].set(data.get("matricula", ""))
-        self.campos["Cargo"].set(data.get("cargo", ""))
-        self.campos["Setor"].set(data.get("setor", ""))
-        self.campos["Tipo de Escala"].set(
-            data.get("escala", "")
-        )  # <-- Campo 'escala' do banco
-        self.campos["Turno Específico"].set(
-            data.get("tipo_turno", "")
-        )  # <-- Campo 'tipo_turno' do banco
-        self.campos["Conselho (Opcional)"].set(data.get("conselho", ""))
-
-        inicio_afast = data.get("afastamento_inicio")
-        fim_afast = data.get("afastamento_fim")
-
-        self.campos["Início do Afastamento"].set(
-            inicio_afast.strftime("%d/%m/%Y") if inicio_afast else ""
-        )
-        self.campos["Fim do Afastamento"].set(
-            fim_afast.strftime("%d/%m/%Y") if fim_afast else ""
-        )
-
-        self.campos["Motivo do Afastamento"].set(data.get("afastamento_motivo", ""))
-
-        self.matricula_entry.configure(state="disabled")
+        # Preenche os campos de texto
+        self.campos["Nome"].set(data.get("nome") or "")
+        self.campos["Matrícula"].set(data.get("matricula") or "")
+        self.campos["Cargo"].set(data.get("cargo") or "")
+        self.campos["Setor"].set(data.get("setor") or "")
+        self.campos["Tipo de Escala"].set(data.get("escala") or "")
+        self.campos["Turno Específico"].set(data.get("tipo_turno") or "")
+        self.campos["Conselho (Opcional)"].set(data.get("conselho") or "") # Corrigido aqui também
+        self.campos["Motivo do Afastamento"].set(data.get("afastamento_motivo") or "") # Corrigido aqui
+        
+        # Preenche os campos de data
+        inicio = data.get("afastamento_inicio")
+        fim = data.get("afastamento_fim")
+        self.campos["Início do Afastamento"].set(inicio.strftime('%d/%m/%Y') if inicio else "")
+        self.campos["Fim do Afastamento"].set(fim.strftime('%d/%m/%Y') if fim else "")
 
         self.matricula_entry.configure(state="disabled")
 

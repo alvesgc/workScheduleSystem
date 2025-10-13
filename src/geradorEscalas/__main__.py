@@ -21,7 +21,7 @@ from . import database as db
 from . import fonts
 
 # --- CONFIGURAÇÕES GLOBAIS ---
-ctk.set_appearance_mode("dark")
+ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
 
 
