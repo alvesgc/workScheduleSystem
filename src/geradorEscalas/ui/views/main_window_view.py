@@ -20,55 +20,87 @@ class MainView(ctk.CTkFrame):
         self.user_data = user_data
         self.username = self.user_data.get("username", "Usuário").title()
 
-        # --- Paleta de cores hierárquica ---
-        primary_color = "#0078D7"
-        hover_primary = "#005EA6"
-        surface_color = "#FFFFFF"
-        sidebar_bg = "#FFFFFF"
-        sidebar_border = "#E0E0E0"
-        icon_inactive = "#A0A0A0"
-        text_primary = "#1E1E1E"
-        text_secondary = "#6B6B6B"
-        danger_color = "#C43E3E"
-        danger_hover = "#A03030"
+        # === PALETA DE CORES HIERÁRQUICA ===
+        # Cores primárias
+        PRIMARY = "#0078D7"
+        PRIMARY_HOVER = "#005EA6"
 
-        # --- Layout base ---
+        # Cores de superfície
+        SURFACE = "#FFFFFF"
+        SURFACE_SECONDARY = "#FAFAFA"
+        BACKGROUND = "#F5F6FA"
+
+        # Bordas e divisores
+        BORDER = "#E1E4E8"
+        BORDER_LIGHT = "#F0F0F0"
+
+        # Textos
+        TEXT_PRIMARY = "#1E1E1E"
+        TEXT_SECONDARY = "#6B6B6B"
+        TEXT_TERTIARY = "#9CA3AF"
+
+        # Botões de navegação
+        NAV_INACTIVE_BG = "#F3F4F6"
+        NAV_INACTIVE_HOVER = "#E5E7EB"
+        NAV_INACTIVE_TEXT = "#4B5563"
+
+        # Ícones
+        ICON_INACTIVE = "#6B7280"
+        ICON_ACTIVE = "#FFFFFF"
+
+        # Botão de sair (danger)
+        DANGER = "#DC2626"
+        DANGER_HOVER = "#B91C1C"
+
+        # === LAYOUT BASE ===
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        # --- Sidebar ---
+        # === SIDEBAR ===
         self.sidebar_frame = ctk.CTkFrame(
             self,
-            width=250,
+            width=260,
             corner_radius=0,
-            fg_color=sidebar_bg,
-            border_color=sidebar_border,
+            fg_color=SURFACE,
+            border_color=BORDER,
             border_width=1,
         )
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_propagate(False)
         self.sidebar_frame.grid_rowconfigure(5, weight=1)
 
-        # --- Ícones ---
+        # === ÍCONES COLORIDOS ===
         icon_size = 20
-        self.icons = {
-            name: fa.icon_to_image(
-                fa_name, fill=icon_inactive, scale_to_height=icon_size
-            )
-            for name, fa_name in {
-                "home": "home",
-                "calendar": "calendar-alt",
-                "users": "users",
-                "logout": "sign-out-alt",
-                "menu": "bars",
-                "close": "times",
-            }.items()
+
+        self.icons_colored = {
+            "home_active": fa.icon_to_image(
+                "home", fill=ICON_ACTIVE, scale_to_height=icon_size
+            ),
+            "home_inactive": fa.icon_to_image(
+                "home", fill=ICON_INACTIVE, scale_to_height=icon_size
+            ),
+            "calendar_active": fa.icon_to_image(
+                "calendar-alt", fill=ICON_ACTIVE, scale_to_height=icon_size
+            ),
+            "calendar_inactive": fa.icon_to_image(
+                "calendar-alt", fill=ICON_INACTIVE, scale_to_height=icon_size
+            ),
+            "users_active": fa.icon_to_image(
+                "users", fill=ICON_ACTIVE, scale_to_height=icon_size
+            ),
+            "users_inactive": fa.icon_to_image(
+                "users", fill=ICON_INACTIVE, scale_to_height=icon_size
+            ),
+            "logout": fa.icon_to_image(
+                "sign-out-alt", fill=ICON_ACTIVE, scale_to_height=icon_size
+            ),
         }
 
-        # --- Perfil do usuário ---
+        # === FOTO DE PERFIL ===
         photo_path = self.user_data.get("foto_path")
         generic_photo_path = "src/geradorEscalas/assets/icons/user_generic.png"
-        image_size = (48, 48)
+        image_size = (56, 56)
+
         try:
             final_path = (
                 photo_path
@@ -90,64 +122,46 @@ class MainView(ctk.CTkFrame):
             )
         except Exception:
             self.profile_image = fa.icon_to_image(
-                "user-circle", fill=icon_inactive, scale_to_height=48
+                "user-circle", fill=ICON_INACTIVE, scale_to_height=56
             )
 
-        # --- Perfil ---
-        self.profile_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
-        self.profile_frame.grid(row=1, column=0, padx=20, pady=20, sticky="ew")
-
-        ctk.CTkLabel(self.profile_frame, text="", image=self.profile_image).pack(
-            pady=(5, 5)
+        # === CABEÇALHO DO PERFIL ===
+        profile_container = ctk.CTkFrame(
+            self.sidebar_frame,
+            fg_color="transparent",
         )
+        profile_container.grid(row=0, column=0, sticky="ew", padx=20, pady=(24, 16))
+
+        ctk.CTkLabel(profile_container, text="", image=self.profile_image).pack(
+            pady=(0, 12)
+        )
+
         ctk.CTkLabel(
-            self.profile_frame,
+            profile_container,
             text=self.username,
             font=fonts.LABEL_FONT,
-            text_color=text_primary,
-        ).pack(pady=(0, 10))
+            text_color=TEXT_PRIMARY,
+        ).pack()
 
-        # --- Botões de navegação ---
-        self.nav_buttons = {}
+        # Divisor após perfil
+        divider_top = ctk.CTkFrame(self.sidebar_frame, height=1, fg_color=BORDER_LIGHT)
+        divider_top.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 8))
+
+        # === ESTILOS DOS BOTÕES ===
         self.style_inactive = {
-            "fg_color": "#E9ECEF",  # cinza mais visível
-            "text_color": "#4A4A4A",  # texto escuro
-            "hover_color": "#DCE2E8",  # leve destaque no hover
+            "fg_color": NAV_INACTIVE_BG,
+            "text_color": NAV_INACTIVE_TEXT,
+            "hover_color": NAV_INACTIVE_HOVER,
         }
 
         self.style_active = {
-            "fg_color": "#0078D7",  # azul principal
-            "text_color": "#FFFFFF",  # texto branco
-            "hover_color": "#005EA6",  # azul escuro no hover
+            "fg_color": PRIMARY,
+            "text_color": ICON_ACTIVE,
+            "hover_color": PRIMARY_HOVER,
         }
 
-        inactive_icon_color = "#3C3C3C"
-        active_icon_color = "#FFFFFF"
-        icon_size = 20
-
-        self.icons_colored = {
-            "home_active": fa.icon_to_image(
-                "home", fill=active_icon_color, scale_to_height=icon_size
-            ),
-            "home_inactive": fa.icon_to_image(
-                "home", fill=inactive_icon_color, scale_to_height=icon_size
-            ),
-            "calendar_active": fa.icon_to_image(
-                "calendar-alt", fill=active_icon_color, scale_to_height=icon_size
-            ),
-            "calendar_inactive": fa.icon_to_image(
-                "calendar-alt", fill=inactive_icon_color, scale_to_height=icon_size
-            ),
-            "users_active": fa.icon_to_image(
-                "users", fill=active_icon_color, scale_to_height=icon_size
-            ),
-            "users_inactive": fa.icon_to_image(
-                "users", fill=inactive_icon_color, scale_to_height=icon_size
-            ),
-            "logout": fa.icon_to_image(
-                "sign-out-alt", fill="#FFFFFF", scale_to_height=icon_size
-            ),
-        }
+        # === BOTÕES DE NAVEGAÇÃO ===
+        self.nav_buttons = {}
 
         button_info = [
             ("home", "  Início", "home", self.show_home_view, 2),
@@ -172,22 +186,21 @@ class MainView(ctk.CTkFrame):
                 command=lambda cmd=command, btn_name=name: self._navigate(
                     cmd, btn_name
                 ),
-                height=42,
+                height=44,
                 corner_radius=8,
-                border_spacing=6,
+                border_spacing=10,
             )
             button.configure(**self.style_inactive)
-            button.grid(row=row, column=0, padx=16, pady=5, sticky="ew")
+            button.grid(row=row, column=0, padx=16, pady=4, sticky="ew")
             self.nav_buttons[name] = button
 
-        divider = ctk.CTkFrame(self.sidebar_frame, height=1, fg_color="#E1E4E8")
-        divider.grid(row=5, column=0, sticky="ew", padx=16, pady=(10, 10))
+        # === DIVISOR ANTES DO LOGOUT ===
+        divider_bottom = ctk.CTkFrame(
+            self.sidebar_frame, height=1, fg_color=BORDER_LIGHT
+        )
+        divider_bottom.grid(row=5, column=0, sticky="ew", padx=20, pady=8)
 
-        # --- Botão de sair ---
-        footer_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
-        footer_frame.grid(row=6, column=0, sticky="sew", padx=10, pady=10)
-        footer_frame.grid_columnconfigure(0, weight=1)
-
+        # === BOTÃO DE SAIR ===
         self.logout_button = ctk.CTkButton(
             self.sidebar_frame,
             text="  Sair",
@@ -195,24 +208,26 @@ class MainView(ctk.CTkFrame):
             compound="left",
             anchor="w",
             command=self.logout,
-            fg_color="#C43E3E",
-            hover_color="#A03030",
+            fg_color=DANGER,
+            hover_color=DANGER_HOVER,
+            text_color=ICON_ACTIVE,
             font=fonts.BUTTON_FONT,
-            height=42,
+            height=44,
             corner_radius=8,
+            border_spacing=10,
         )
-        self.logout_button.grid(row=6, column=0, padx=16, pady=(0, 10), sticky="ew")
+        self.logout_button.grid(row=6, column=0, padx=16, pady=(0, 16), sticky="ew")
 
-        # --- Área de conteúdo ---
+        # === ÁREA DE CONTEÚDO ===
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.content_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        self.content_frame.grid(row=0, column=1, sticky="nsew")
         self.content_frame.grid_rowconfigure(0, weight=1)
         self.content_frame.grid_columnconfigure(0, weight=1)
 
         # Inicia na Home
         self._navigate(self.show_home_view, "home")
 
-    # --- Navegação ---
+    # === MÉTODOS DE NAVEGAÇÃO ===
     def _navigate(self, command, button_name):
         command()
         self._highlight_button(button_name)
