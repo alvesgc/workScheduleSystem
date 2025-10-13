@@ -14,7 +14,7 @@ from .gerador_escala_view import GeradorEscalaView
 
 class MainView(ctk.CTkFrame):
     def __init__(self, master, app_controller, user_data, app_version):
-        super().__init__(master, fg_color="#242424")
+        super().__init__(master)
         self.app_controller = app_controller
         self.sidebar_expanded = True
         self.user_data = user_data
@@ -25,7 +25,8 @@ class MainView(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=1)
 
         # --- Sidebar ---
-        self.sidebar_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#DCDCDC")
+        sidebar_color = ctk.ThemeManager.theme["CTkFrame"]["fg_color"]
+        self.sidebar_frame = ctk.CTkFrame(self, corner_radius=0, fg_color=sidebar_color)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(5, weight=1) 
 
@@ -113,7 +114,7 @@ class MainView(ctk.CTkFrame):
 
         # --- Dicionário e Estilos para Botões de Navegação ---
         self.nav_buttons = {}
-        self.style_inactive = {"fg_color": "transparent", "hover_color": "#DCDCDC"}
+        self.style_inactive = {"fg_color": "transparent", "hover_color": "white"}
         self.style_active = {"fg_color": "#1F6AA5", "hover_color": "#1F6AA5"}
 
         button_info = [
