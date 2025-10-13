@@ -63,7 +63,7 @@ class HomeView(ctk.CTkFrame):
 
         # === CONTAINER PRINCIPAL (para padding consistente) ===
         main_container = ctk.CTkFrame(self, fg_color="transparent")
-        main_container.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
+        main_container.grid(row=0, column=0, sticky="nsew")
         main_container.grid_columnconfigure(0, weight=1)
         main_container.grid_rowconfigure(2, weight=1)
         main_container.grid_rowconfigure(3, weight=0)
@@ -74,7 +74,7 @@ class HomeView(ctk.CTkFrame):
             fg_color="transparent",
             corner_radius=0,
         )
-        header_frame.grid(row=0, column=0, sticky="ew", pady=(0, 24))
+        header_frame.grid(row=0, column=0, sticky="ew", padx=24, pady=(24, 24))
 
         ctk.CTkLabel(
             header_frame,
@@ -92,7 +92,7 @@ class HomeView(ctk.CTkFrame):
 
         # === CARDS DE ESTATÍSTICAS ===
         stats_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        stats_frame.grid(row=1, column=0, sticky="ew", pady=(0, 24))
+        stats_frame.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 24))
         stats_frame.grid_columnconfigure((0, 1), weight=1, uniform="stats")
 
         stats_data = [
@@ -141,7 +141,7 @@ class HomeView(ctk.CTkFrame):
             border_width=1,
             corner_radius=12,
         )
-        leaves_panel.grid(row=2, column=0, sticky="nsew", pady=(0, 24))
+        leaves_panel.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 24))
         leaves_panel.grid_rowconfigure(1, weight=1)
         leaves_panel.grid_columnconfigure(0, weight=1)
 
@@ -214,7 +214,7 @@ class HomeView(ctk.CTkFrame):
 
         # === BOTÕES DE AÇÃO ===
         action_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        action_frame.grid(row=3, column=0, sticky="ew")
+        action_frame.grid(row=3, column=0, sticky="ew", padx=24, pady=(0, 16))
         action_frame.grid_columnconfigure((0, 1), weight=1, uniform="actions")
 
         # Botão principal
@@ -223,13 +223,14 @@ class HomeView(ctk.CTkFrame):
             text="Gerar Nova Escala",
             image=self.icon_calendar,
             command=app_controller.show_escala_wizard,
-            height=48,
+            height=44,
             font=fonts.BUTTON_FONT,
             fg_color=PRIMARY,
             hover_color=PRIMARY_HOVER,
             text_color="white",
-            corner_radius=10,
+            corner_radius=8,
             compound="left",
+            border_spacing=10,
         ).grid(row=0, column=0, padx=(0, 12), sticky="ew")
 
         # Botão secundário
@@ -238,13 +239,14 @@ class HomeView(ctk.CTkFrame):
             text="Gerenciar Colaboradores",
             image=self.icon_user_cog,
             command=app_controller.show_colaboradores_view,
-            height=48,
+            height=44,
             font=fonts.BUTTON_FONT,
             fg_color=BUTTON_SECONDARY,
             hover_color=BUTTON_SECONDARY_HOVER,
             text_color=TEXT_PRIMARY,
             border_width=1,
             border_color=BUTTON_SECONDARY_BORDER,
-            corner_radius=10,
+            corner_radius=8,
             compound="left",
+            border_spacing=10,
         ).grid(row=0, column=1, padx=(0, 0), sticky="ew")
