@@ -18,9 +18,31 @@ ChecklistDropdown = checklist.ChecklistDropdown
 
 class GeradorEscalaView(ctk.CTkFrame):
     def __init__(self, master, app_controller):
-        super().__init__(master, fg_color="transparent")
+        super().__init__(master, fg_color="#F5F6FA")
         self.app_controller = app_controller
         self.ultima_escala_gerada = None
+
+        # === PALETA DE CORES HIERÁRQUICA ===
+        PRIMARY = "#0078D7"
+        PRIMARY_HOVER = "#005EA6"
+        
+        SURFACE = "#FFFFFF"
+        SURFACE_SECONDARY = "#FAFAFA"
+        BACKGROUND = "#F5F6FA"
+        
+        BORDER = "#E1E4E8"
+        BORDER_LIGHT = "#F0F0F0"
+        
+        TEXT_PRIMARY = "#1E1E1E"
+        TEXT_SECONDARY = "#6B6B6B"
+        TEXT_TERTIARY = "#9CA3AF"
+        
+        BUTTON_SECONDARY = "#FFFFFF"
+        BUTTON_SECONDARY_HOVER = "#F5F5F5"
+        BUTTON_SECONDARY_BORDER = "#D1D5DB"
+        
+        SUCCESS = "#10B981"
+        SUCCESS_HOVER = "#059669"
 
         # --- Carrega os dados para os filtros ---
         self.escala_filter_vars = {
@@ -38,126 +60,196 @@ class GeradorEscalaView(ctk.CTkFrame):
             setor: ctk.StringVar(value="on") for setor in db.get_distinct_setores()
         }
 
-        # --- Ícones ---
-        icon_color = "#DCE4EE"
+        # === ÍCONES ===
         icon_size = 16
         self.icons = {
             "filter": fa.icon_to_image(
-                "filter", fill=icon_color, scale_to_height=icon_size
+                "filter", fill=TEXT_SECONDARY, scale_to_height=icon_size
             ),
             "users": fa.icon_to_image(
-                "users", fill=icon_color, scale_to_height=icon_size
+                "users", fill=TEXT_SECONDARY, scale_to_height=icon_size
             ),
             "generate": fa.icon_to_image(
-                "cogs", fill=icon_color, scale_to_height=icon_size
+                "cogs", fill="#FFFFFF", scale_to_height=icon_size
             ),
             "save": fa.icon_to_image(
-                "save", fill=icon_color, scale_to_height=icon_size
+                "save", fill="#FFFFFF", scale_to_height=icon_size
             ),
             "excel": fa.icon_to_image(
-                "file-excel", fill=icon_color, scale_to_height=icon_size
+                "file-excel", fill="#FFFFFF", scale_to_height=icon_size
             ),
             "pdf": fa.icon_to_image(
-                "file-pdf", fill=icon_color, scale_to_height=icon_size
+                "file-pdf", fill="#FFFFFF", scale_to_height=icon_size
             ),
         }
 
-        # --- Layout Principal ---
+        # === LAYOUT PRINCIPAL ===
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)  # A linha 2 (tabela) expande
+        self.grid_rowconfigure(3, weight=1)
 
-        # --- Frame de Controles (Topo) com Borda ---
-        controls_frame = ctk.CTkFrame(self, border_width=1, border_color="gray30")
-        controls_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        controls_frame.grid_columnconfigure(
-            1, weight=1
-        )  # Coluna "vazia" para empurrar o botão Gerar
+        # === CABEÇALHO ===
+        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        header_frame.grid(row=0, column=0, sticky="ew", padx=24, pady=(24, 16))
+        
+        ctk.CTkLabel(
+            header_frame,
+            text="Gerar Escala",
+            font=fonts.TITULO_SECAO,
+            text_color=TEXT_PRIMARY,
+        ).pack(anchor="w", pady=(0, 4))
+        
+        ctk.CTkLabel(
+            header_frame,
+            text="Configure o período e filtros para gerar a escala de trabalho.",
+            font=fonts.SUBTITULO,
+            text_color=TEXT_SECONDARY,
+        ).pack(anchor="w")
 
-        # Frame interno para não ter borda dupla
-        inner_controls_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
-        inner_controls_frame.grid(
-            row=0, column=0, columnspan=2, padx=10, pady=5, sticky="ew"
+        # === PAINEL DE CONTROLES ===
+        controls_container = ctk.CTkFrame(
+            self,
+            fg_color=SURFACE,
+            border_color=BORDER,
+            border_width=1,
+            corner_radius=12,
         )
-        inner_controls_frame.grid_columnconfigure(5, weight=1)
+        controls_container.grid(row=1, column=0, padx=24, pady=(0, 16), sticky="ew")
+        
+        # Frame único com todos os controles
+        controls_frame = ctk.CTkFrame(controls_container, fg_color="transparent")
+        controls_frame.pack(fill="x", padx=16, pady=14)
+        controls_frame.grid_columnconfigure(5, weight=1)
 
         # Período (Mês e Ano)
         meses_nomes = [
-            "Janeiro",
-            "Fevereiro",
-            "Março",
-            "Abril",
-            "Maio",
-            "Junho",
-            "Julho",
-            "Agosto",
-            "Setembro",
-            "Outubro",
-            "Novembro",
-            "Dezembro",
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
         ]
         self.meses_map = {nome: i + 1 for i, nome in enumerate(meses_nomes)}
         self.mes_var = ctk.StringVar(value=meses_nomes[datetime.now().month - 1])
-        ctk.CTkLabel(inner_controls_frame, text="Mês:", font=fonts.LABEL_FONT).grid(
-            row=0, column=0, padx=(0, 5), pady=10
+        
+        ctk.CTkLabel(
+            controls_frame,
+            text="Mês:",
+            font=fonts.SUBTITULO,
+            text_color=TEXT_PRIMARY
+        ).grid(row=0, column=0, padx=(0, 6), sticky="w")
+        
+        # Frame wrapper para simular borda no dropdown
+        mes_wrapper = ctk.CTkFrame(
+            controls_frame,
+            fg_color="transparent",
+            border_color=BUTTON_SECONDARY_BORDER,
+            border_width=1,
+            corner_radius=8,
         )
+        mes_wrapper.grid(row=0, column=1, padx=(0, 12))
+        
         ctk.CTkOptionMenu(
-            inner_controls_frame, variable=self.mes_var, values=meses_nomes, width=120
-        ).grid(row=0, column=1, padx=(0, 20), pady=10)
-        ctk.CTkLabel(inner_controls_frame, text="Ano:", font=fonts.LABEL_FONT).grid(
-            row=0, column=2, padx=(0, 5), pady=10
-        )
+            mes_wrapper,
+            variable=self.mes_var,
+            values=meses_nomes,
+            width=108,
+            fg_color=BUTTON_SECONDARY,
+            button_color=PRIMARY,
+            button_hover_color=PRIMARY_HOVER,
+            text_color=TEXT_PRIMARY,
+            font=fonts.SUBTITULO,
+            dropdown_fg_color=SURFACE,
+            dropdown_hover_color=SURFACE_SECONDARY,
+            dropdown_text_color=TEXT_PRIMARY,
+            corner_radius=7,
+        ).pack(padx=1, pady=1)
+        
+        ctk.CTkLabel(
+            controls_frame,
+            text="Ano:",
+            font=fonts.SUBTITULO,
+            text_color=TEXT_PRIMARY
+        ).grid(row=0, column=2, padx=(0, 6), sticky="w")
+        
         self.ano_var = ctk.StringVar(value=str(datetime.now().year))
-        ctk.CTkEntry(inner_controls_frame, textvariable=self.ano_var, width=80).grid(
-            row=0, column=3, padx=(0, 20), pady=10
-        )
+        ctk.CTkEntry(
+            controls_frame,
+            textvariable=self.ano_var,
+            width=70,
+            fg_color=BUTTON_SECONDARY,
+            border_color=BUTTON_SECONDARY_BORDER,
+            text_color=TEXT_PRIMARY,
+            font=fonts.SUBTITULO,
+            corner_radius=8,
+        ).grid(row=0, column=3, padx=(0, 24))
 
         # Botões de Filtro
-        filter_buttons_frame = ctk.CTkFrame(
-            inner_controls_frame, fg_color="transparent"
-        )
-        filter_buttons_frame.grid(row=0, column=4, sticky="w")
         self.escala_filter_button = ctk.CTkButton(
-            filter_buttons_frame,
-            text="Escalas",
-            font=fonts.BUTTON_FONT,
+            controls_frame,
+            text="Escalas (0/0)",
+            font=fonts.SUBTITULO,
             image=self.icons.get("filter"),
             compound="left",
             command=self._open_escala_filter,
+            fg_color=BUTTON_SECONDARY,
+            hover_color=BUTTON_SECONDARY_HOVER,
+            text_color=TEXT_PRIMARY,
+            border_width=1,
+            border_color=BUTTON_SECONDARY_BORDER,
+            height=34,
+            corner_radius=8,
         )
-        self.escala_filter_button.pack(side="left", padx=5)
+        self.escala_filter_button.grid(row=0, column=4, padx=(0, 6))
+        
         self.setor_filter_button = ctk.CTkButton(
-            filter_buttons_frame,
-            text="Setores",
-            font=fonts.BUTTON_FONT,
+            controls_frame,
+            text="Setores (0/0)",
+            font=fonts.SUBTITULO,
             image=self.icons.get("filter"),
             compound="left",
             command=self._open_setor_filter,
+            fg_color=BUTTON_SECONDARY,
+            hover_color=BUTTON_SECONDARY_HOVER,
+            text_color=TEXT_PRIMARY,
+            border_width=1,
+            border_color=BUTTON_SECONDARY_BORDER,
+            height=34,
+            corner_radius=8,
         )
-        self.setor_filter_button.pack(side="left", padx=5)
+        self.setor_filter_button.grid(row=0, column=5, padx=(0, 6))
+        
         self.colab_filter_button = ctk.CTkButton(
-            filter_buttons_frame,
-            text="Colaboradores",
-            font=fonts.BUTTON_FONT,
+            controls_frame,
+            text="Colaboradores (0/0)",
+            font=fonts.SUBTITULO,
             image=self.icons.get("users"),
             compound="left",
             command=self._open_colab_filter,
+            fg_color=BUTTON_SECONDARY,
+            hover_color=BUTTON_SECONDARY_HOVER,
+            text_color=TEXT_PRIMARY,
+            border_width=1,
+            border_color=BUTTON_SECONDARY_BORDER,
+            height=34,
+            corner_radius=8,
         )
-        self.colab_filter_button.pack(side="left", padx=5)
+        self.colab_filter_button.grid(row=0, column=6, padx=(0, 24))
 
         # Botão Gerar Prévia
         self.generate_button = ctk.CTkButton(
-            inner_controls_frame,
+            controls_frame,
             text="Gerar Prévia",
             image=self.icons.get("generate"),
             compound="left",
-            font=fonts.BUTTON_FONT,
+            font=fonts.SUBTITULO,
             command=self._gerar_previa,
+            fg_color=PRIMARY,
+            hover_color=PRIMARY_HOVER,
+            height=34,
+            corner_radius=8,
         )
-        self.generate_button.grid(row=0, column=6, padx=(20, 0), pady=10, sticky="e")
+        self.generate_button.grid(row=0, column=7, sticky="e")
 
-        # --- Frame de Ações ---
+        # === FRAME DE AÇÕES ===
         actions_frame = ctk.CTkFrame(self, fg_color="transparent")
-        actions_frame.grid(row=1, column=0, padx=10, pady=0, sticky="e")
+        actions_frame.grid(row=2, column=0, padx=24, pady=(0, 12), sticky="e")
 
         self.salvar_button = ctk.CTkButton(
             actions_frame,
@@ -167,51 +259,65 @@ class GeradorEscalaView(ctk.CTkFrame):
             compound="left",
             state="disabled",
             command=self._salvar_no_historico,
+            fg_color=SUCCESS,
+            hover_color=SUCCESS_HOVER,
+            height=36,
+            corner_radius=8,
         )
-        self.salvar_button.pack(side="left", padx=5)
+        self.salvar_button.pack(side="left", padx=(0, 8))
+        
         self.excel_button = ctk.CTkButton(
             actions_frame,
-            text="Excel",
+            text="Exportar Excel",
             font=fonts.BUTTON_FONT,
             image=self.icons.get("excel"),
             compound="left",
             state="disabled",
             command=self._exportar_para_excel,
+            fg_color=PRIMARY,
+            hover_color=PRIMARY_HOVER,
+            height=36,
+            corner_radius=8,
         )
-        self.excel_button.pack(side="left", padx=5)
+        self.excel_button.pack(side="left", padx=(0, 8))
+        
         self.pdf_button = ctk.CTkButton(
             actions_frame,
-            text="PDF",
+            text="Exportar PDF",
             font=fonts.BUTTON_FONT,
             image=self.icons.get("pdf"),
             compound="left",
             state="disabled",
             command=self._exportar_para_pdf,
+            fg_color=PRIMARY,
+            hover_color=PRIMARY_HOVER,
+            height=36,
+            corner_radius=8,
         )
-        self.pdf_button.pack(side="left", padx=5)
+        self.pdf_button.pack(side="left")
 
-        # --- ESTRUTURA DA TABELA CORRIGIDA ---
-        # 1. Cria um "Container" que terá a borda e nunca será limpo.
-        table_container = ctk.CTkFrame(self, border_width=1, border_color="gray30")
-        table_container.grid(row=3, column=0, padx=10, pady=10, sticky="nsew")
+        # === CONTAINER DA TABELA ===
+        table_container = ctk.CTkFrame(
+            self,
+            fg_color=SURFACE,
+            border_width=1,
+            border_color=BORDER,
+            corner_radius=12,
+        )
+        table_container.grid(row=3, column=0, padx=24, pady=(0, 24), sticky="nsew")
         table_container.grid_rowconfigure(0, weight=1)
         table_container.grid_columnconfigure(0, weight=1)
 
-        # 2. O 'preview_frame' agora vive DENTRO do container e não tem borda própria.
-        # É este frame que será limpo e preenchido.
         self.preview_frame = ctk.CTkFrame(table_container, fg_color="transparent")
-        self.preview_frame.grid(
-            row=0, column=0, sticky="nsew", padx=1, pady=1
-        )  # Padding para a borda ser visível
+        self.preview_frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         self.preview_frame.grid_rowconfigure(0, weight=1)
         self.preview_frame.grid_columnconfigure(0, weight=1)
-        # --- FIM DA ESTRUTURA CORRIGIDA ---
 
         self.empty_label = ctk.CTkLabel(
             self.preview_frame,
-            text="Selecione o Mês e Ano e clique em 'Gerar Prévia' para começar.",
+            text="Selecione o mês e ano e clique em 'Gerar Prévia' para começar.",
             font=fonts.SUBTITULO,
-            text_color="gray60",
+            text_color=TEXT_TERTIARY,
         )
         self.empty_label.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -220,22 +326,51 @@ class GeradorEscalaView(ctk.CTkFrame):
         self._update_setor_filter_button_text()
 
     def _setup_treeview(self):
-        """
-        Cria a tabela usando o componente CTkAdvancedTable e define
-        as colunas específicas para a tela de geração de escala.
-        """
+        """Cria a tabela usando o componente CTkAdvancedTable."""
         for widget in self.preview_frame.winfo_children():
             widget.destroy()
 
         colunas = ["Colaborador"] + [str(i) for i in range(1, 32)]
 
-        # 1. Cria a tabela usando nosso componente customizado
         self.tree = CTkAdvancedTable(
             self.preview_frame, columns=colunas, show_checkbox_column=False
         )
         self.tree.grid(row=0, column=0, sticky="nsew")
 
-        # 2. Configura as colunas (isso permanece aqui, pois é específico desta tela)
+        # Configuração de cores da tabela
+        style = ttk.Style()
+        style.theme_use('default')
+        
+        # Cores do header (cabeçalho)
+        style.configure(
+            "Treeview.Heading",
+            background="#0078D7",
+            foreground="#FFFFFF",
+            relief="flat",
+            borderwidth=1,
+            font=fonts.LABEL_FONT
+        )
+        style.map("Treeview.Heading",
+            background=[("active", "#005EA6")]
+        )
+        
+        # Cores do corpo da tabela
+        style.configure(
+            "Treeview",
+            background="#FFFFFF",
+            foreground="#1E1E1E",
+            fieldbackground="#FFFFFF",
+            borderwidth=0,
+            font=fonts.TEXTO_NORMAL
+        )
+        
+        # Cores das linhas alternadas
+        self.tree.tag_configure('evenrow', background='#FFFFFF')
+        self.tree.tag_configure('oddrow', background='#F9FAFB')
+        self.tree.tag_configure('trabalho', foreground='#1E1E1E')
+        self.tree.tag_configure('afastamento', foreground='#DC2626')
+        self.tree.tag_configure('critical_escala', font=fonts.BUTTON_FONT)
+
         self.tree.heading("Colaborador", text="Colaborador", anchor="w")
         self.tree.column(
             "Colaborador", width=350, minwidth=250, anchor="w", stretch=ctk.NO
@@ -248,7 +383,6 @@ class GeradorEscalaView(ctk.CTkFrame):
                 str(i), width=45, minwidth=min_width, anchor="center", stretch=ctk.NO
             )
 
-        # 3. Configura os scrollbars
         vsb = ctk.CTkScrollbar(self.preview_frame, command=self.tree.yview)
         vsb.grid(row=0, column=1, sticky="ns")
         hsb = ctk.CTkScrollbar(
@@ -275,7 +409,6 @@ class GeradorEscalaView(ctk.CTkFrame):
             messagebox.showerror("Erro ao Salvar", message)
 
     def _open_escala_filter(self):
-        # Monta o dicionário de itens para o dropdown
         items_for_dropdown = {
             escala: var for escala, var in self.escala_filter_vars.items()
         }
@@ -330,27 +463,22 @@ class GeradorEscalaView(ctk.CTkFrame):
         )
 
     def _executar_geracao(self):
-        """
-        Coleta os filtros, busca os dados, chama o motor de geração e preenche a tabela.
-        """
-        # --- LÓGICA DE FEEDBACK VISUAL (CARREGAMENTO) ---
-        self._setup_treeview()  # Limpa e prepara a tabela para novos dados
+        """Coleta os filtros, busca os dados, chama o motor de geração e preenche a tabela."""
+        self._setup_treeview()
         loading_label = ctk.CTkLabel(
             self.tree,
             text="Gerando escala, por favor aguarde...",
             font=fonts.SUBTITULO,
-            bg_color="#2B2B2B",
+            text_color="#6B6B6B",
         )
         loading_label.place(relx=0.5, rely=0.5, anchor="center")
         self.generate_button.configure(state="disabled")
-        # Desativa botões de ação para evitar cliques durante a geração
         self.salvar_button.configure(state="disabled")
         self.excel_button.configure(state="disabled")
         self.pdf_button.configure(state="disabled")
-        self.update_idletasks()  # Força a UI a redesenhar e mostrar o "loading"
+        self.update_idletasks()
 
         try:
-            # --- 1. COLETAR FILTROS DA TELA ---
             filtros = {"escala_types": [], "matriculas": [], "setores": []}
 
             for escala, var in self.escala_filter_vars.items():
@@ -364,7 +492,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             for setor, var in self.setor_filter_vars.items():
                 if var.get() == "on":
                     filtros["setores"].append(setor)
-            # --- 2. BUSCAR COLABORADORES JÁ FILTRADOS NO BANCO ---
+
             colaboradores_para_gerar = db.get_all_active_collaborators(filtros=filtros)
 
             if not colaboradores_para_gerar:
@@ -373,24 +501,20 @@ class GeradorEscalaView(ctk.CTkFrame):
                     "Nenhum colaborador corresponde aos filtros selecionados.",
                     parent=self,
                 )
-                return  # Encerra a execução se não houver ninguém para gerar a escala
+                return
 
-            # --- 3. EXECUTAR O MOTOR COM OS DADOS FILTRADOS ---
             mes_numero = self.meses_map[self.mes_var.get()]
             ano = int(self.ano_var.get())
 
             self._marcar_dias_especiais(ano, mes_numero)
 
             engine = GeradorEscalaEngine(ano, mes_numero)
-            # Passa a lista já filtrada para o motor
             dados_escala = engine.executar(colaboradores_para_gerar)
 
-            # Guarda a escala gerada para poder salvar/exportar depois
             self.ultima_escala_gerada = dados_escala
 
             self._preencher_tabela(dados_escala)
 
-            # --- 4. ATIVAR BOTÕES DE AÇÃO ---
             self.salvar_button.configure(state="normal")
             self.excel_button.configure(state="normal")
             self.pdf_button.configure(state="normal")
@@ -401,41 +525,24 @@ class GeradorEscalaView(ctk.CTkFrame):
             )
 
         finally:
-            # --- 5. LIMPEZA FINAL ---
-            # Garante que o label de loading seja removido e o botão reativado, mesmo se der erro
             if loading_label.winfo_exists():
                 loading_label.destroy()
             self.generate_button.configure(state="normal")
-
-    def _marcar_fins_de_semana(self, ano, mes):
-        """Adiciona um marcador visual nos cabeçalhos de Sábados e Domingos."""
-        try:
-            num_dias = monthrange(ano, mes)[1]
-            for dia in range(1, 32):
-                # Reseta o cabeçalho para o padrão
-                self.tree.heading(str(dia), text=str(dia))
-                if dia <= num_dias and weekday(ano, mes, dia) >= 5:  # 5=Sáb, 6=Dom
-                    self.tree.heading(str(dia), text=f"•{dia}•")
-        except Exception as e:
-            print(f"Erro ao marcar fins de semana: {e}")
 
     def _marcar_dias_especiais(self, ano, mes):
         """Adiciona marcadores visuais nos cabeçalhos de dias especiais."""
         today = datetime.now()
         num_dias = monthrange(ano, mes)[1]
         for dia in range(1, 32):
-            # Reseta o cabeçalho para o padrão
             self.tree.heading(str(dia), text=str(dia))
             if dia <= num_dias:
-                # Marca fins de semana
-                if weekday(ano, mes, dia) >= 5:  # 5=Sáb, 6=Dom
+                if weekday(ano, mes, dia) >= 5:
                     self.tree.heading(str(dia), text=f"•{dia}•")
-                # Marca o dia atual com um destaque diferente
                 if ano == today.year and mes == today.month and dia == today.day:
                     self.tree.heading(str(dia), text=f"[{dia}]")
                     
     def _preencher_tabela(self, dados_escala):
-        """Preenche a tabela com 'X' para trabalho e 'F' para folga, aplicando estilos de linha."""
+        """Preenche a tabela com 'X' para trabalho e 'F' para folga."""
         for item in self.tree.get_children():
             self.tree.delete(item)
 
@@ -450,44 +557,39 @@ class GeradorEscalaView(ctk.CTkFrame):
             dias_info = info.get("dias", [])
             dias_de_trabalho = {turno['dia']: turno for turno in dias_info}
 
-            # --- LÓGICA DE PRIORIDADE DE COR PARA A LINHA INTEIRA ---
             tem_afastamento = any(turno.get('em_afastamento') for turno in dias_info)
-            tem_escala_critica = info.get('escala') in ['24x72', '24x120'] # Exemplo de como pegar a escala
+            tem_escala_critica = info.get('escala') in ['24x72', '24x120']
 
             if tem_afastamento:
                 tags_da_linha.append('afastamento')
-            elif dias_de_trabalho: # Se trabalhou algum dia
+            elif dias_de_trabalho:
                 tags_da_linha.append('trabalho')
 
             if tem_escala_critica:
                 tags_da_linha.append('critical_escala')
             
-            # --- PREPARA A LISTA DE VALORES PARA A LINHA ---
             valores_linha = [info.get("nome", matricula)]
             for dia in range(1, 32):
                 if dia > num_dias_no_mes:
-                    valores_linha.append('') # Células vazias para meses com menos de 31 dias
+                    valores_linha.append('')
                     continue
                 
-                valor_celula = "F" # Padrão é Folga
+                valor_celula = "F"
                 if dia in dias_de_trabalho:
                     esta_afastado = dias_de_trabalho[dia].get("em_afastamento", False)
                     valor_celula = "X(A)" if esta_afastado else "X"
                 
                 valores_linha.append(valor_celula)
             
-            # Insere a linha completa de uma vez com as tags corretas
             self.tree.insert("", "end", values=valores_linha, tags=tuple(tags_da_linha))
-
             row_count += 1
 
     def _salvar_no_historico(self):
-        """Pega a última escala gerada e pede ao controller para salvá-la, com confirmação."""
+        """Salva a escala gerada no histórico."""
         if self.ultima_escala_gerada:
             mes_nome = self.mes_var.get()
             ano = self.ano_var.get()
 
-            # --- ADIÇÃO DA CONFIRMAÇÃO ---
             confirmar = messagebox.askyesno(
                 "Confirmar",
                 f"Deseja salvar a escala de {mes_nome}/{ano} no histórico?\n"
@@ -525,18 +627,12 @@ class GeradorEscalaView(ctk.CTkFrame):
                 exporters.exportar_para_excel(
                     self.ultima_escala_gerada, int(ano), mes_numero, caminho_arquivo
                 )
-                messagebox.showinfo(
-                    "Sucesso",
-                    f"Arquivo Excel salvo em:\n{caminho_arquivo}",
-                    parent=self,
-                )
                 abrir_pasta = messagebox.askyesno(
                     "Sucesso",
                     f"Arquivo Excel salvo com sucesso!\n\nDeseja abrir a pasta onde o arquivo foi salvo?",
                     parent=self,
                 )
                 if abrir_pasta:
-                    # Abre o explorador de arquivos na pasta do arquivo salvo
                     os.startfile(os.path.dirname(caminho_arquivo))
 
             except Exception as e:
@@ -566,16 +662,12 @@ class GeradorEscalaView(ctk.CTkFrame):
                 exporters.exportar_para_pdf(
                     self.ultima_escala_gerada, int(ano), mes_numero, caminho_arquivo
                 )
-                messagebox.showinfo(
-                    "Sucesso", f"Arquivo PDF salvo em:\n{caminho_arquivo}", parent=self
-                )
                 abrir_pasta = messagebox.askyesno(
                     "Sucesso",
-                    f"Arquivo Excel salvo com sucesso!\n\nDeseja abrir a pasta onde o arquivo foi salvo?",
+                    f"Arquivo PDF salvo com sucesso!\n\nDeseja abrir a pasta onde o arquivo foi salvo?",
                     parent=self,
                 )
                 if abrir_pasta:
-                    # Abre o explorador de arquivos na pasta do arquivo salvo
                     os.startfile(os.path.dirname(caminho_arquivo))
 
             except Exception as e:
