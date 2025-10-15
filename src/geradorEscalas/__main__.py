@@ -182,12 +182,18 @@ class App(ctk.CTk):
         self.current_view.pack(expand=True, fill="both")
 
     def show_registration_view(self):
-        self.center_window() 
         reg_window = ctk.CTkToplevel(self)
-        reg_window.title("Cadastro de Novo Usuário")  # Define o título da janela
-        reg_window.geometry("400x500")  # Define a largura x altura
-        reg_window.resizable(False, False)  # Impede que o usuário redimensione
-    
+        reg_window.title("Cadastro de Novo Usuário")
+        reg_window.geometry("400x500")
+        reg_window.resizable(False, False)
+
+        reg_window.update_idletasks() # Força a atualização das dimensões da janela
+        width = reg_window.winfo_width()
+        height = reg_window.winfo_height()
+        x = (reg_window.winfo_screenwidth() // 2) - (width // 2)
+        y = (reg_window.winfo_screenheight() // 2) - (height // 2)
+        reg_window.geometry(f"{width}x{height}+{x}+{y}") # Define a posição centralizada
+
         view = UserRegistrationView(
             reg_window,
             save_callback=lambda data, win=reg_window: self.on_save_user(data, win),
