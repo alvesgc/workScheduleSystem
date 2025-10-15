@@ -1,11 +1,12 @@
 import customtkinter as ctk
 import tkfontawesome as fa
+
 from ... import database as db
 from ... import fonts
 
 
 class HomeView(ctk.CTkFrame):
-    def __init__(self, master, app_controller, **kwargs):
+    def __init__(self, master, app_controller,  main_view, **kwargs):
         super().__init__(master, fg_color="#F5F6FA")
         self.app_controller = app_controller
 
@@ -66,7 +67,7 @@ class HomeView(ctk.CTkFrame):
         main_container.grid(row=0, column=0, sticky="nsew")
         main_container.grid_columnconfigure(0, weight=1)
         main_container.grid_rowconfigure(2, weight=1)
-        main_container.grid_rowconfigure(3, weight=0)
+        # main_container.grid_rowconfigure(3, weight=0)
 
         # === CABEÇALHO ===
         header_frame = ctk.CTkFrame(
@@ -141,7 +142,7 @@ class HomeView(ctk.CTkFrame):
             border_width=1,
             corner_radius=12,
         )
-        leaves_panel.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 24))
+        leaves_panel.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 54))
         leaves_panel.grid_rowconfigure(1, weight=1)
         leaves_panel.grid_columnconfigure(0, weight=1)
 
@@ -214,7 +215,7 @@ class HomeView(ctk.CTkFrame):
 
         # === BOTÕES DE AÇÃO ===
         action_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        action_frame.grid(row=3, column=0, sticky="ew", padx=24, pady=(0, 16))
+        action_frame.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 16))
         action_frame.grid_columnconfigure((0, 1), weight=1, uniform="actions")
 
         # Botão principal
@@ -222,7 +223,7 @@ class HomeView(ctk.CTkFrame):
             action_frame,
             text="Gerar Nova Escala",
             image=self.icon_calendar,
-            command=app_controller.show_escala_wizard,
+            command=lambda: main_view._navigate(main_view.show_escala_wizard, "escala"),
             height=44,
             font=fonts.BUTTON_FONT,
             fg_color=PRIMARY,
@@ -231,14 +232,14 @@ class HomeView(ctk.CTkFrame):
             corner_radius=8,
             compound="left",
             border_spacing=10,
-        ).grid(row=0, column=0, padx=(0, 12), sticky="ew")
+        ).grid(row=0, column=0, padx=(0, 8), sticky="ew")
 
         # Botão secundário
         ctk.CTkButton(
             action_frame,
             text="Gerenciar Colaboradores",
             image=self.icon_user_cog,
-            command=app_controller.show_colaboradores_view,
+            command=lambda: main_view._navigate(main_view.show_colaboradores_view, "colaboradores"),
             height=44,
             font=fonts.BUTTON_FONT,
             fg_color=BUTTON_SECONDARY,
@@ -249,4 +250,4 @@ class HomeView(ctk.CTkFrame):
             corner_radius=8,
             compound="left",
             border_spacing=10,
-        ).grid(row=0, column=1, padx=(0, 0), sticky="ew")
+        ).grid(row=0, column=1, padx=(8, 0), sticky="ew") 
