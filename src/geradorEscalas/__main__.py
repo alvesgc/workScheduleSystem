@@ -109,7 +109,7 @@ class App(ctk.CTk):
             print("Os ícones podem não ser exibidos corretamente.")
 
         self.title("Acesso ao Sistema")
-        self.geometry("400x500")  # Tamanho fixo e menor para o login
+        self.geometry("400x600")  # Tamanho fixo e menor para o login
         self.resizable(False, False)  # A tela de login não deve ser redimensionável
         self.center_window()  # Nova função para centralizar a janela
         self.protocol("WM_DELETE_WINDOW", self.quit)
@@ -160,7 +160,7 @@ class App(ctk.CTk):
 
     def logout(self):
         self.current_user_info = None  # Limpa o usuário ao sair
-        self.geometry("400x500")
+        self.geometry("400x600")
         self.resizable(False, False)
         self.show_login_view()
 
@@ -184,7 +184,7 @@ class App(ctk.CTk):
     def show_registration_view(self):
         reg_window = ctk.CTkToplevel(self)
         reg_window.title("Cadastro de Novo Usuário")
-        reg_window.geometry("400x500")
+        reg_window.geometry("400x600")
         reg_window.resizable(False, False)
 
         reg_window.update_idletasks() # Força a atualização das dimensões da janela

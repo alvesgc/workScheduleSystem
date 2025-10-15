@@ -8,6 +8,7 @@ BUTTON_FONT = None
 TITULO_SECAO = None
 SUBTITULO = None
 TITULO_CARD = None
+TEXTO_PEQUENO = None
 
 def init_fonts():
     """
@@ -29,6 +30,7 @@ def init_fonts():
 
         # --- Definições dos estilos de fonte usando os nomes das famílias ---
         # (Após carregar com FontManager, podemos usar o nome da família da fonte)
+        TEXTO_PEQUENO = ctk.CTkFont(family="Poppins", size=12)
         TEXTO_NORMAL = ctk.CTkFont(family="Poppins", size=14)
         LABEL_FONT = ctk.CTkFont(family="Poppins Bold", size=14)
         BUTTON_FONT = ctk.CTkFont(family="Poppins Bold", size=14)
