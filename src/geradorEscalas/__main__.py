@@ -293,8 +293,10 @@ class App(ctk.CTk):
 
     # --- MÉTODO ADICIONADO ---
     def show_cadastro_manual_view(self, matricula_para_editar=None):
+        """Abre a tela de cadastro/edição manual diretamente."""
+        # Esta função agora usa o _show_view para trocar o conteúdo da MainView
         if isinstance(self.current_view, MainView):
-            self.current_view.show_cadastro_manual_view(matricula_para_editar)
+            self.current_view.show_cadastro_manual_view(matricula_para_editar=matricula_para_editar)
 
     def on_import_colaboradores(self):
         """
@@ -404,6 +406,7 @@ class App(ctk.CTk):
             messagebox.showerror("Erro", message, parent=self)
 
     def show_edicao_lote_view(self, dados_selecionados):
+        """Abre a tela de edição em lote diretamente."""
         if isinstance(self.current_view, MainView):
             self.current_view.show_edicao_lote_view(dados_selecionados)
 

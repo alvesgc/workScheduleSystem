@@ -267,6 +267,22 @@ class MainView(ctk.CTkFrame):
             app_controller=self.app_controller,
             data_to_load=invalid_rows,
         )
+        
+    def show_cadastro_manual_view(self, matricula_para_editar=None):
+        """Mostra a tela de cadastro manual, passando a matrícula se estiver em modo de edição."""
+        self._show_content(
+            CadastroManualView,
+            app_controller=self.app_controller,
+            matricula_para_editar=matricula_para_editar,
+        )
+
+    # --- MÉTODO NOVO ADICIONADO AQUI ---
+    def show_edicao_lote_view(self, dados_selecionados):
+        self._show_content(
+            EdicaoEmLoteView,
+            app_controller=self.app_controller,
+            dados_para_editar=dados_selecionados,
+        )
 
     def logout(self):
         if messagebox.askyesno(
