@@ -25,22 +25,22 @@ class GeradorEscalaView(ctk.CTkFrame):
         # === PALETA DE CORES HIERÁRQUICA ===
         PRIMARY = "#0078D7"
         PRIMARY_HOVER = "#005EA6"
-        
+
         SURFACE = "#FFFFFF"
         SURFACE_SECONDARY = "#FAFAFA"
         BACKGROUND = "#F5F6FA"
-        
+
         BORDER = "#E1E4E8"
         BORDER_LIGHT = "#F0F0F0"
-        
+
         TEXT_PRIMARY = "#1E1E1E"
         TEXT_SECONDARY = "#6B6B6B"
         TEXT_TERTIARY = "#9CA3AF"
-        
+
         BUTTON_SECONDARY = "#FFFFFF"
         BUTTON_SECONDARY_HOVER = "#F5F5F5"
         BUTTON_SECONDARY_BORDER = "#D1D5DB"
-        
+
         SUCCESS = "#10B981"
         SUCCESS_HOVER = "#059669"
 
@@ -72,9 +72,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             "generate": fa.icon_to_image(
                 "cogs", fill="#FFFFFF", scale_to_height=icon_size
             ),
-            "save": fa.icon_to_image(
-                "save", fill="#FFFFFF", scale_to_height=icon_size
-            ),
+            "save": fa.icon_to_image("save", fill="#FFFFFF", scale_to_height=icon_size),
             "excel": fa.icon_to_image(
                 "file-excel", fill="#FFFFFF", scale_to_height=icon_size
             ),
@@ -90,14 +88,14 @@ class GeradorEscalaView(ctk.CTkFrame):
         # === CABEÇALHO ===
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
         header_frame.grid(row=0, column=0, sticky="ew", padx=24, pady=(24, 16))
-        
+
         ctk.CTkLabel(
             header_frame,
             text="Gerar Escala",
             font=fonts.TITULO_SECAO,
             text_color=TEXT_PRIMARY,
         ).pack(anchor="w", pady=(0, 4))
-        
+
         ctk.CTkLabel(
             header_frame,
             text="Configure o período e filtros para gerar a escala de trabalho.",
@@ -114,7 +112,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             corner_radius=12,
         )
         controls_container.grid(row=1, column=0, padx=24, pady=(0, 16), sticky="ew")
-        
+
         # Frame único com todos os controles
         controls_frame = ctk.CTkFrame(controls_container, fg_color="transparent")
         controls_frame.pack(fill="x", padx=16, pady=14)
@@ -122,19 +120,26 @@ class GeradorEscalaView(ctk.CTkFrame):
 
         # Período (Mês e Ano)
         meses_nomes = [
-            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+            "Janeiro",
+            "Fevereiro",
+            "Março",
+            "Abril",
+            "Maio",
+            "Junho",
+            "Julho",
+            "Agosto",
+            "Setembro",
+            "Outubro",
+            "Novembro",
+            "Dezembro",
         ]
         self.meses_map = {nome: i + 1 for i, nome in enumerate(meses_nomes)}
         self.mes_var = ctk.StringVar(value=meses_nomes[datetime.now().month - 1])
-        
+
         ctk.CTkLabel(
-            controls_frame,
-            text="Mês:",
-            font=fonts.SUBTITULO,
-            text_color=TEXT_PRIMARY
+            controls_frame, text="Mês:", font=fonts.SUBTITULO, text_color=TEXT_PRIMARY
         ).grid(row=0, column=0, padx=(0, 6), sticky="w")
-        
+
         # Frame wrapper para simular borda no dropdown
         mes_wrapper = ctk.CTkFrame(
             controls_frame,
@@ -144,7 +149,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             corner_radius=8,
         )
         mes_wrapper.grid(row=0, column=1, padx=(0, 12))
-        
+
         ctk.CTkOptionMenu(
             mes_wrapper,
             variable=self.mes_var,
@@ -160,14 +165,11 @@ class GeradorEscalaView(ctk.CTkFrame):
             dropdown_text_color=TEXT_PRIMARY,
             corner_radius=7,
         ).pack(padx=1, pady=1)
-        
+
         ctk.CTkLabel(
-            controls_frame,
-            text="Ano:",
-            font=fonts.SUBTITULO,
-            text_color=TEXT_PRIMARY
+            controls_frame, text="Ano:", font=fonts.SUBTITULO, text_color=TEXT_PRIMARY
         ).grid(row=0, column=2, padx=(0, 6), sticky="w")
-        
+
         self.ano_var = ctk.StringVar(value=str(datetime.now().year))
         ctk.CTkEntry(
             controls_frame,
@@ -197,7 +199,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             corner_radius=8,
         )
         self.escala_filter_button.grid(row=0, column=4, padx=(0, 6))
-        
+
         self.setor_filter_button = ctk.CTkButton(
             controls_frame,
             text="Setores (0/0)",
@@ -214,7 +216,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             corner_radius=8,
         )
         self.setor_filter_button.grid(row=0, column=5, padx=(0, 6))
-        
+
         self.colab_filter_button = ctk.CTkButton(
             controls_frame,
             text="Colaboradores (0/0)",
@@ -265,7 +267,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             corner_radius=8,
         )
         self.salvar_button.pack(side="left", padx=(0, 8))
-        
+
         self.excel_button = ctk.CTkButton(
             actions_frame,
             text="Exportar Excel",
@@ -280,7 +282,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             corner_radius=8,
         )
         self.excel_button.pack(side="left", padx=(0, 8))
-        
+
         self.pdf_button = ctk.CTkButton(
             actions_frame,
             text="Exportar PDF",
@@ -332,57 +334,32 @@ class GeradorEscalaView(ctk.CTkFrame):
 
         colunas = ["Colaborador"] + [str(i) for i in range(1, 32)]
 
+        # Cria a tabela com tema claro (padrão)
         self.tree = CTkAdvancedTable(
             self.preview_frame, columns=colunas, show_checkbox_column=False
         )
         self.tree.grid(row=0, column=0, sticky="nsew")
 
-        # Configuração de cores da tabela
-        style = ttk.Style()
-        style.theme_use('default')
-        
-        # Cores do header (cabeçalho)
-        style.configure(
-            "Treeview.Heading",
-            background="#0078D7",
-            foreground="#FFFFFF",
-            relief="flat",
-            borderwidth=1,
-            font=fonts.LABEL_FONT
-        )
-        style.map("Treeview.Heading",
-            background=[("active", "#005EA6")]
-        )
-        
-        # Cores do corpo da tabela
-        style.configure(
-            "Treeview",
-            background="#FFFFFF",
-            foreground="#1E1E1E",
-            fieldbackground="#FFFFFF",
-            borderwidth=0,
-            font=fonts.TEXTO_NORMAL
-        )
-        
-        # Cores das linhas alternadas
-        self.tree.tag_configure('evenrow', background='#FFFFFF')
-        self.tree.tag_configure('oddrow', background='#F9FAFB')
-        self.tree.tag_configure('trabalho', foreground='#1E1E1E')
-        self.tree.tag_configure('afastamento', foreground='#DC2626')
-        self.tree.tag_configure('critical_escala', font=fonts.BUTTON_FONT)
+        # Força a atualização do widget antes de configurar as colunas
+        self.tree.update_idletasks()
 
+        # Configuração das colunas
         self.tree.heading("Colaborador", text="Colaborador", anchor="w")
         self.tree.column(
             "Colaborador", width=350, minwidth=250, anchor="w", stretch=ctk.NO
         )
 
         for i in range(1, 32):
-            self.tree.heading(str(i), text=str(i))
-            min_width = 70 if i % 8 == 1 and i > 1 else 45
+            self.tree.heading(str(i), text=str(i), anchor="center")
+            # Colunas dinâmicas com largura suficiente para números de 2 dígitos
             self.tree.column(
-                str(i), width=45, minwidth=min_width, anchor="center", stretch=ctk.NO
+                str(i), width=50, minwidth=50, anchor="center", stretch=ctk.YES
             )
 
+        # Força outra atualização após configurar os headings
+        self.tree.update_idletasks()
+
+        # Scrollbars
         vsb = ctk.CTkScrollbar(self.preview_frame, command=self.tree.yview)
         vsb.grid(row=0, column=1, sticky="ns")
         hsb = ctk.CTkScrollbar(
@@ -540,7 +517,7 @@ class GeradorEscalaView(ctk.CTkFrame):
                     self.tree.heading(str(dia), text=f"•{dia}•")
                 if ano == today.year and mes == today.month and dia == today.day:
                     self.tree.heading(str(dia), text=f"[{dia}]")
-                    
+
     def _preencher_tabela(self, dados_escala):
         """Preenche a tabela com 'X' para trabalho e 'F' para folga."""
         for item in self.tree.get_children():
@@ -552,35 +529,35 @@ class GeradorEscalaView(ctk.CTkFrame):
 
         row_count = 0
         for matricula, info in dados_escala.items():
-            tags_da_linha = ['evenrow' if row_count % 2 == 0 else 'oddrow']
-            
-            dias_info = info.get("dias", [])
-            dias_de_trabalho = {turno['dia']: turno for turno in dias_info}
+            tags_da_linha = ["evenrow" if row_count % 2 == 0 else "oddrow"]
 
-            tem_afastamento = any(turno.get('em_afastamento') for turno in dias_info)
-            tem_escala_critica = info.get('escala') in ['24x72', '24x120']
+            dias_info = info.get("dias", [])
+            dias_de_trabalho = {turno["dia"]: turno for turno in dias_info}
+
+            tem_afastamento = any(turno.get("em_afastamento") for turno in dias_info)
+            tem_escala_critica = info.get("escala") in ["24x72", "24x120"]
 
             if tem_afastamento:
-                tags_da_linha.append('afastamento')
+                tags_da_linha.append("afastamento")
             elif dias_de_trabalho:
-                tags_da_linha.append('trabalho')
+                tags_da_linha.append("trabalho")
 
             if tem_escala_critica:
-                tags_da_linha.append('critical_escala')
-            
+                tags_da_linha.append("critical_escala")
+
             valores_linha = [info.get("nome", matricula)]
             for dia in range(1, 32):
                 if dia > num_dias_no_mes:
-                    valores_linha.append('')
+                    valores_linha.append("")
                     continue
-                
+
                 valor_celula = "F"
                 if dia in dias_de_trabalho:
                     esta_afastado = dias_de_trabalho[dia].get("em_afastamento", False)
                     valor_celula = "X(A)" if esta_afastado else "X"
-                
+
                 valores_linha.append(valor_celula)
-            
+
             self.tree.insert("", "end", values=valores_linha, tags=tuple(tags_da_linha))
             row_count += 1
 
