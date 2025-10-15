@@ -1,124 +1,122 @@
 import customtkinter as ctk
-from tkinter import filedialog
-from PIL import Image
-import os
 from ... import fonts
 
 
 class UserRegistrationView(ctk.CTkFrame):
     def __init__(self, master, save_callback, back_callback):
-        super().__init__(master)
+        # Fundo principal da tela, herda a cor da janela pop-up
+        super().__init__(master, fg_color="transparent")
         self.save_callback = save_callback
         self.back_callback = back_callback
-        self.selected_photo_path = None
 
-        self.pack_propagate(False)
-        main_frame = ctk.CTkFrame(self, fg_color="transparent")
-        main_frame.pack(expand=True, padx=30, pady=20)
+        # === PALETA DE CORES ===
+        SURFACE = "#FFFFFF"
+        BORDER = "#E1E4E8"
+        TEXT_PRIMARY = "#1E1E1E"
+        TEXT_SECONDARY = "#6B6B6B"
+        BUTTON_SECONDARY = "#F3F4F6"
+        BUTTON_SECONDARY_HOVER = "#E5E7EB"
+        BUTTON_SECONDARY_BORDER = "#D1D5DB"
+        SUCCESS = "#10B981"
+        SUCCESS_HOVER = "#059669"
 
-        # --- CORREÇÃO DE FONTE ---
+        # --- Container principal para centralizar o card ---
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        # --- Card do Formulário ---
+        form_card = ctk.CTkFrame(self, fg_color=SURFACE, corner_radius=12)
+        form_card.grid(row=0, column=0, sticky="", padx=20, pady=20)
+
+        # Frame interno para padding
+        main_frame = ctk.CTkFrame(form_card, fg_color="transparent")
+        main_frame.pack(expand=True, padx=24, pady=20)
+
+        # --- Título ---
         ctk.CTkLabel(
-            main_frame, text="Cadastro de Usuário", font=fonts.TITULO_SECAO
-        ).pack(pady=(0, 20))
-
-        # --- Seção da Foto de Perfil ---
-        ctk.CTkLabel(
-            main_frame, text="Foto de Perfil (Opcional):", font=fonts.LABEL_FONT
-        ).pack()
-        
-        self.photo_preview = ctk.CTkLabel(main_frame, text="")
-        self.photo_preview.pack(pady=10)
-        self._load_and_display_image()
-        # --- CORREÇÃO DE FONTE ---
-        ctk.CTkButton(
             main_frame,
-            text="Selecionar Foto...",
-            command=self._select_photo,
-            font=fonts.BUTTON_FONT,
-        ).pack(pady=(0, 20))
+            text="Novo Usuário",
+            font=fonts.TITULO_SECAO,
+            text_color=TEXT_PRIMARY,
+            justify="left",  
+        ).pack(pady=(0, 20), anchor="w", fill="x") 
 
         # --- Campos de Dados ---
-        # --- CORREÇÃO DE FONTE ---
-        ctk.CTkLabel(main_frame, text="Nome de Usuário:", font=fonts.LABEL_FONT).pack(
-            anchor="w"
-        )
+        ctk.CTkLabel(
+            main_frame,
+            text="Nome de Usuário",
+            font=fonts.LABEL_FONT,
+            text_color=TEXT_SECONDARY,
+        ).pack(anchor="w")
         self.user_entry = ctk.CTkEntry(
             main_frame,
             placeholder_text="Apenas letras, números, _ ou -",
             font=fonts.TEXTO_NORMAL,
+            height=36,
+            corner_radius=8,
+            border_color=BORDER,
         )
-        self.user_entry.pack(fill="x", pady=5)
+        self.user_entry.pack(fill="x", pady=(4, 12))
 
-        ctk.CTkLabel(main_frame, text="Senha:", font=fonts.LABEL_FONT).pack(
-            anchor="w", pady=(10, 0)
-        )
+        ctk.CTkLabel(
+            main_frame, text="Senha:", font=fonts.LABEL_FONT, text_color=TEXT_SECONDARY
+        ).pack(anchor="w")
         self.pass_entry = ctk.CTkEntry(
             main_frame,
             placeholder_text="Digite a senha",
             show="*",
             font=fonts.TEXTO_NORMAL,
+            height=36,
+            corner_radius=8,
+            border_color=BORDER,
         )
-        self.pass_entry.pack(fill="x", pady=5)
+        self.pass_entry.pack(fill="x", pady=(4, 12))
 
-        ctk.CTkLabel(main_frame, text="Confirmar Senha:", font=fonts.LABEL_FONT).pack(
-            anchor="w", pady=(10, 0)
-        )
+        ctk.CTkLabel(
+            main_frame,
+            text="Confirmar Senha:",
+            font=fonts.LABEL_FONT,
+            text_color=TEXT_SECONDARY,
+        ).pack(anchor="w")
         self.confirm_pass_entry = ctk.CTkEntry(
             main_frame,
             placeholder_text="Confirme a senha",
             show="*",
             font=fonts.TEXTO_NORMAL,
+            height=36,
+            corner_radius=8,
+            border_color=BORDER,
         )
-        self.confirm_pass_entry.pack(fill="x", pady=5)
+        self.confirm_pass_entry.pack(fill="x", pady=4)
 
         # --- Botões de Ação ---
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(fill="x", pady=(30, 0))
+        button_frame.pack(fill="x", pady=(24, 0))
         button_frame.grid_columnconfigure((0, 1), weight=1)
 
-        # --- CORREÇÃO DE FONTE ---
         ctk.CTkButton(
             button_frame,
             text="Salvar Cadastro",
             command=self._on_save,
-            height=40,
+            height=44,
             font=fonts.BUTTON_FONT,
-        ).grid(row=0, column=0, padx=(0, 5), sticky="ew")
+            fg_color=SUCCESS,
+            hover_color=SUCCESS_HOVER,
+            corner_radius=8,
+        ).grid(row=0, column=0, padx=(0, 8), sticky="ew")
         ctk.CTkButton(
             button_frame,
             text="Voltar",
             command=self.back_callback,
-            height=40,
-            fg_color="#7A7A7A",
-            hover_color="#5E5E5E",
+            height=44,
             font=fonts.BUTTON_FONT,
-        ).grid(row=0, column=1, padx=(5, 0), sticky="ew")
-
-    def _load_and_display_image(self, path=None):
-        """Carrega e exibe uma imagem na tela, usando uma genérica como padrão."""
-        # Caminho para sua imagem genérica. Verifique se este caminho está correto.
-        generic_path = "src/geradorEscalas/assets/icons/user_generic.png"
-
-        image_path = generic_path
-        if path and os.path.exists(path):
-            image_path = path
-
-        try:
-            image = ctk.CTkImage(Image.open(image_path), size=(100, 100))
-            self.photo_preview.configure(image=image)
-        except Exception as e:
-            print(f"Erro ao carregar imagem de perfil: {e}")
-            self.photo_preview.configure(image=None, text="Erro ao\ncarregar\nimagem")
-
-    def _select_photo(self):
-        """Abre uma janela para o usuário selecionar uma foto de perfil."""
-        filepath = filedialog.askopenfilename(
-            title="Selecione uma foto de perfil",
-            filetypes=[("Imagens", "*.png *.jpg *.jpeg")],
-        )
-        if filepath:
-            self.selected_photo_path = filepath
-            self._load_and_display_image(filepath)
+            fg_color=BUTTON_SECONDARY,
+            hover_color=BUTTON_SECONDARY_HOVER,
+            text_color=TEXT_PRIMARY,
+            border_width=1,
+            border_color=BUTTON_SECONDARY_BORDER,
+            corner_radius=8,
+        ).grid(row=0, column=1, padx=(8, 0), sticky="ew")
 
     def _on_save(self):
         """Coleta os dados do formulário e os envia para o controlador principal."""
@@ -126,7 +124,6 @@ class UserRegistrationView(ctk.CTkFrame):
             "username": self.user_entry.get(),
             "password": self.pass_entry.get(),
             "confirm_password": self.confirm_pass_entry.get(),
-            "photo_path": self.selected_photo_path,
-            # --- REMOVIDO: 'role' não é mais coletado da UI ---
         }
-        self.save_callback(data)  # A chamada de callback foi simplificada
+        # Passa a janela para o callback poder fechá-la
+        self.save_callback(data, self.winfo_toplevel())

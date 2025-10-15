@@ -10,10 +10,6 @@ class LoginView(ctk.CTkFrame):
         self.login_callback = login_callback
         self.register_callback = register_callback
 
-        # --- REMOVIDO: As StringVars não são mais necessárias ---
-        # self.user_var = ctk.StringVar()
-        # self.pass_var = ctk.StringVar()
-
         # --- Estrutura de Grid para Centralização ---
         self.grid_columnconfigure((0, 2), weight=1)
         self.grid_rowconfigure((0, 2), weight=1)

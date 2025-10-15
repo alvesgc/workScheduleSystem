@@ -182,11 +182,12 @@ class App(ctk.CTk):
         self.current_view.pack(expand=True, fill="both")
 
     def show_registration_view(self):
+        self.center_window() 
         reg_window = ctk.CTkToplevel(self)
-        reg_window.title("Cadastro de Usuário")  # Define o título da janela
-        reg_window.geometry("450x680")  # Define a largura x altura
+        reg_window.title("Cadastro de Novo Usuário")  # Define o título da janela
+        reg_window.geometry("400x500")  # Define a largura x altura
         reg_window.resizable(False, False)  # Impede que o usuário redimensione
-
+    
         view = UserRegistrationView(
             reg_window,
             save_callback=lambda data, win=reg_window: self.on_save_user(data, win),
@@ -197,7 +198,7 @@ class App(ctk.CTk):
         reg_window.transient(self)
         reg_window.grab_set()
         reg_window.focus()
-
+        
     def on_save_colaborador(self, dados, matricula_original=None):
         """
         Salva um novo colaborador ou atualiza um existente.
