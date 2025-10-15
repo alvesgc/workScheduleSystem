@@ -4,24 +4,39 @@ from tkinter import messagebox
 from ... import fonts
 from ... import database as db
 from ..widgets.ctk_calendar import CTkCalendar
-
+import tkfontawesome as fa
 
 class CadastroManualView(ctk.CTkFrame):
     def __init__(self, master, app_controller, **kwargs):
         super().__init__(master, fg_color="transparent")
-
         self.app_controller = app_controller
         self.back_callback = app_controller.show_colaboradores_view
         self.matricula_para_editar = kwargs.get("matricula_para_editar")
 
-        # --- CORREÇÃO: "Tipo de Turno" renomeado para "Escala" e o antigo "Escala" removido ---
+        # --- PALETA DE CORES (consistente com as outras telas) ---
+        SURFACE = "#FFFFFF"
+        BORDER = "#E1E4E8"
+        TEXT_PRIMARY = "#1E1E1E"
+        TEXT_SECONDARY = "#6B6B6B"
+        PRIMARY = "#0078D7"; PRIMARY_HOVER = "#005EA6"
+        PRIMARY_HOVER = "#005EA6"
+
+        # Bordas e divisores
+        BORDER = "#E1E4E8"
+
+        # Botões secundários
+        BUTTON_SECONDARY = "#FFFFFF"
+        BUTTON_SECONDARY_HOVER = "#F5F5F5"
+        BUTTON_SECONDARY_BORDER = "#D1D5DB"
+
+        # --- Dicionário de Campos ---
         self.campos = {
             "Nome": ctk.StringVar(),
             "Matrícula": ctk.StringVar(),
             "Cargo": ctk.StringVar(),
             "Setor": ctk.StringVar(),
-            "Tipo de Escala": ctk.StringVar(),  # Para 12x36, Diarista, etc.
-            "Turno Específico": ctk.StringVar(),  # Para Diurno 1, Noturno 2, etc.
+            "Tipo de Escala": ctk.StringVar(),
+            "Turno Específico": ctk.StringVar(),
             "Conselho (Opcional)": ctk.StringVar(),
             "Início do Afastamento": ctk.StringVar(),
             "Fim do Afastamento": ctk.StringVar(),
@@ -29,26 +44,51 @@ class CadastroManualView(ctk.CTkFrame):
         }
         self._trace_active = True
 
+        # --- Layout Principal ---
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
+        # --- Cabeçalho ---
+        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        header_frame.grid(row=0, column=0, padx=24, pady=(24, 16), sticky="w")
         self.title_label = ctk.CTkLabel(
-            self, text="Novo Colaborador", font=fonts.TITULO_SECAO
+            header_frame,
+            text="Novo Colaborador",
+            font=fonts.TITULO_SECAO,
+            text_color=TEXT_PRIMARY,
         )
-        self.title_label.grid(row=0, column=0, pady=(0, 20), sticky="w")
+        self.title_label.pack(anchor="w")
 
-        scrollable_frame = ctk.CTkScrollableFrame(self)
-        scrollable_frame.grid(row=1, column=0, sticky="nsew")
+        # --- Card Principal para o Formulário ---
+        form_container = ctk.CTkFrame(
+            self,
+            fg_color=SURFACE,
+            border_color=BORDER,
+            border_width=1,
+            corner_radius=12,
+        )
+        form_container.grid(row=1, column=0, padx=24, pady=(0, 16), sticky="nsew")
+        form_container.grid_columnconfigure(0, weight=1)
+        form_container.grid_rowconfigure(0, weight=1)
+
+        scrollable_frame = ctk.CTkScrollableFrame(
+            form_container, fg_color="transparent"
+        )
+        scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
         scrollable_frame.grid_columnconfigure(1, weight=1)
 
-        # --- LÓGICA DO LOOP CORRIGIDA ---
+        icon_color = ctk.ThemeManager.theme["CTkButton"]["text_color"]
+        icon_color = icon_color[0] if ctk.get_appearance_mode() == "Light" else icon_color[1]
+        icon_calendar = fa.icon_to_image("calendar-alt", fill=icon_color, scale_to_height=16)
+        
+        # --- L ÓGICA DO LOOP CORRIGIDA ---
         for i, (label, var) in enumerate(self.campos.items()):
             ctk.CTkLabel(
                 scrollable_frame, text=f"{label}:", font=fonts.LABEL_FONT
             ).grid(row=i, column=0, sticky="w", padx=20, pady=10)
 
             entry = None  # Inicializa a variável 'entry'
-            
+
             if "Afastamento" in label and ("Início" in label or "Fim" in label):
                 date_frame = ctk.CTkFrame(scrollable_frame, fg_color="transparent")
                 date_frame.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
@@ -66,10 +106,12 @@ class CadastroManualView(ctk.CTkFrame):
                 )
                 btn = ctk.CTkButton(
                     date_frame,
-                    text="...",
-                    width=35,
-                    height=35,
-                    command=lambda v=var: self._open_calendar(v),
+                    text="", # Sem texto
+                    image=icon_calendar,
+                    width=35, height=35,
+                    fg_color=PRIMARY, # Usa a cor azul do tema
+                    hover_color=PRIMARY_HOVER,
+                    command=lambda v=var: self._open_calendar(v)
                 )
                 btn.grid(row=0, column=1, padx=(5, 0))
 
@@ -80,8 +122,9 @@ class CadastroManualView(ctk.CTkFrame):
                     values=db.get_distinct_escala_types(),
                     height=35,
                     font=fonts.TEXTO_NORMAL,
+                    button_color=PRIMARY,
+                    dropdown_hover_color=PRIMARY_HOVER
                 )
-
             elif label == "Turno Específico":
                 entry = ctk.CTkComboBox(
                     scrollable_frame,
@@ -90,6 +133,8 @@ class CadastroManualView(ctk.CTkFrame):
                     height=35,
                     font=fonts.TEXTO_NORMAL,
                     state="readonly",
+                    button_color=PRIMARY,
+                    dropdown_hover_color=PRIMARY_HOVER
                 )
             else:
                 entry = ctk.CTkEntry(
@@ -100,31 +145,40 @@ class CadastroManualView(ctk.CTkFrame):
                 )
 
             if not ("Afastamento" in label and ("Início" in label or "Fim" in label)):
-                entry.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
+                entry.grid(row=i, column=1, padx=20, pady=12, sticky="ew")
 
             if label == "Matrícula":
                 self.matricula_entry = entry
 
         # --- Botões de Ação ---
         button_frame = ctk.CTkFrame(self, fg_color="transparent")
-        button_frame.grid(row=2, column=0, pady=20, sticky="ew")
+        button_frame.grid(row=2, column=0, pady=(0, 24), padx=24, sticky="ew")
         button_frame.grid_columnconfigure((0, 1), weight=1)
+
         ctk.CTkButton(
             button_frame,
             text="Salvar",
             command=self._save,
             height=45,
             font=fonts.BUTTON_FONT,
-        ).grid(row=0, column=0, padx=(0, 5), sticky="ew")
+            fg_color=PRIMARY,
+            hover_color=PRIMARY_HOVER,
+        ).grid(row=0, column=0, padx=(0, 8), sticky="ew")
         ctk.CTkButton(
             button_frame,
             text="Voltar",
             command=self.back_callback,
-            fg_color="#7A7A7A",
-            hover_color="#5E5E5E",
-            height=45,
+            height=44,
             font=fonts.BUTTON_FONT,
-        ).grid(row=0, column=1, padx=(5, 0), sticky="ew")
+            fg_color=BUTTON_SECONDARY,
+            hover_color=BUTTON_SECONDARY_HOVER,
+            text_color=TEXT_PRIMARY,
+            border_width=1,
+            border_color=BUTTON_SECONDARY_BORDER,
+            corner_radius=8,
+            compound="left",
+            border_spacing=10,
+        ).grid(row=0, column=1, padx=(8, 0), sticky="ew")
 
         if self.matricula_para_editar:
             self.load_data_for_editing()
@@ -145,14 +199,20 @@ class CadastroManualView(ctk.CTkFrame):
         self.campos["Setor"].set(data.get("setor") or "")
         self.campos["Tipo de Escala"].set(data.get("escala") or "")
         self.campos["Turno Específico"].set(data.get("tipo_turno") or "")
-        self.campos["Conselho (Opcional)"].set(data.get("conselho") or "") # Corrigido aqui também
-        self.campos["Motivo do Afastamento"].set(data.get("afastamento_motivo") or "") # Corrigido aqui
-        
+        self.campos["Conselho (Opcional)"].set(
+            data.get("conselho") or ""
+        )  # Corrigido aqui também
+        self.campos["Motivo do Afastamento"].set(
+            data.get("afastamento_motivo") or ""
+        )  # Corrigido aqui
+
         # Preenche os campos de data
         inicio = data.get("afastamento_inicio")
         fim = data.get("afastamento_fim")
-        self.campos["Início do Afastamento"].set(inicio.strftime('%d/%m/%Y') if inicio else "")
-        self.campos["Fim do Afastamento"].set(fim.strftime('%d/%m/%Y') if fim else "")
+        self.campos["Início do Afastamento"].set(
+            inicio.strftime("%d/%m/%Y") if inicio else ""
+        )
+        self.campos["Fim do Afastamento"].set(fim.strftime("%d/%m/%Y") if fim else "")
 
         self.matricula_entry.configure(state="disabled")
 
