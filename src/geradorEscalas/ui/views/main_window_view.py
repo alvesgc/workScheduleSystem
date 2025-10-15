@@ -2,7 +2,7 @@ import os
 import customtkinter as ctk
 import tkfontawesome as fa
 from tkinter import messagebox
-from PIL import Image as PIL_Image, ImageDraw
+from PIL import Image as PIL_Image, ImageOps
 from ... import fonts
 
 from .home_view import HomeView
@@ -96,54 +96,42 @@ class MainView(ctk.CTkFrame):
             ),
         }
 
-        # === FOTO DE PERFIL ===
-        photo_path = self.user_data.get("foto_path")
-        generic_photo_path = "src/geradorEscalas/assets/icons/user_generic.png"
-        image_size = (56, 56)
+        # === LOGO  ===
+        logo_path = "src/geradorEscalas/assets/logo.png"
 
         try:
-            final_path = (
-                photo_path
-                if photo_path and os.path.exists(photo_path)
-                else generic_photo_path
-            )
-            pil_image = PIL_Image.open(final_path).resize(
-                image_size, PIL_Image.Resampling.LANCZOS
-            )
-            mask = PIL_Image.new("L", image_size, 0)
-            draw = ImageDraw.Draw(mask)
-            draw.ellipse((0, 0) + image_size, fill=255)
-            circular_pil_image = PIL_Image.new("RGBA", image_size, (0, 0, 0, 0))
-            circular_pil_image.paste(pil_image, (0, 0), mask)
-            self.profile_image = ctk.CTkImage(
-                light_image=circular_pil_image,
-                dark_image=circular_pil_image,
-                size=image_size,
+            pil_logo = PIL_Image.open(logo_path)
+            max_size = (160, 80)  # limite máximo de largura e altura
+            pil_logo.thumbnail(
+                max_size, PIL_Image.Resampling.LANCZOS
+            )  # mantém proporção
+            pil_logo = ImageOps.contain(
+                pil_logo, max_size
+            )  # garante encaixe sem distorção
+
+            self.company_logo = ctk.CTkImage(
+                light_image=pil_logo,
+                dark_image=pil_logo,
+                size=pil_logo.size,  # usa o tamanho real, sem forçar
             )
         except Exception:
-            self.profile_image = fa.icon_to_image(
-                "user-circle", fill=ICON_INACTIVE, scale_to_height=56
+            self.company_logo = fa.icon_to_image(
+                "building", fill="#6B7280", scale_to_height=56
             )
 
-        # === CABEÇALHO DO PERFIL ===
-        profile_container = ctk.CTkFrame(
+        logo_container = ctk.CTkFrame(
             self.sidebar_frame,
             fg_color="transparent",
         )
-        profile_container.grid(row=0, column=0, sticky="ew", padx=20, pady=(24, 16))
-
-        ctk.CTkLabel(profile_container, text="", image=self.profile_image).pack(
-            pady=(0, 12)
-        )
+        logo_container.grid(row=0, column=0, sticky="ew", padx=20, pady=(28, 20))
 
         ctk.CTkLabel(
-            profile_container,
-            text=self.username,
-            font=fonts.LABEL_FONT,
-            text_color=TEXT_PRIMARY,
-        ).pack()
+            logo_container,
+            text="",  # sem texto, apenas a imagem
+            image=self.company_logo,
+        ).pack(pady=(0, 0))
 
-        # Divisor após perfil
+        # Divisor abaixo da logo
         divider_top = ctk.CTkFrame(self.sidebar_frame, height=1, fg_color=BORDER_LIGHT)
         divider_top.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 8))
 
@@ -267,7 +255,7 @@ class MainView(ctk.CTkFrame):
             app_controller=self.app_controller,
             data_to_load=invalid_rows,
         )
-        
+
     def show_cadastro_manual_view(self, matricula_para_editar=None):
         """Mostra a tela de cadastro manual, passando a matrícula se estiver em modo de edição."""
         self._show_content(
