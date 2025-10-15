@@ -6,28 +6,29 @@ from ... import database as db
 from ..widgets.ctk_calendar import CTkCalendar
 import tkfontawesome as fa
 
+
 class CadastroManualView(ctk.CTkFrame):
     def __init__(self, master, app_controller, **kwargs):
-        super().__init__(master, fg_color="transparent")
+        super().__init__(master, fg_color="#F5F6FA")
         self.app_controller = app_controller
         self.back_callback = app_controller.show_colaboradores_view
         self.matricula_para_editar = kwargs.get("matricula_para_editar")
 
-        # --- PALETA DE CORES (consistente com as outras telas) ---
-        SURFACE = "#FFFFFF"
-        BORDER = "#E1E4E8"
-        TEXT_PRIMARY = "#1E1E1E"
-        TEXT_SECONDARY = "#6B6B6B"
-        PRIMARY = "#0078D7"; PRIMARY_HOVER = "#005EA6"
-        PRIMARY_HOVER = "#005EA6"
-
-        # Bordas e divisores
-        BORDER = "#E1E4E8"
-
-        # Botões secundários
-        BUTTON_SECONDARY = "#FFFFFF"
-        BUTTON_SECONDARY_HOVER = "#F5F5F5"
-        BUTTON_SECONDARY_BORDER = "#D1D5DB"
+        # === PALETA DE CORES HIERÁRQUICA ===
+        self.PRIMARY = "#0078D7"
+        self.PRIMARY_HOVER = "#005EA6"
+        self.SURFACE = "#FFFFFF"
+        self.SURFACE_SECONDARY = "#FAFAFA"
+        self.BORDER = "#E1E4E8"
+        self.BORDER_LIGHT = "#F0F0F0"
+        self.TEXT_PRIMARY = "#1E1E1E"
+        self.TEXT_SECONDARY = "#6B6B6B"
+        self.TEXT_TERTIARY = "#9CA3AF"
+        self.BUTTON_SECONDARY = "#FFFFFF"
+        self.BUTTON_SECONDARY_HOVER = "#F5F5F5"
+        self.BUTTON_SECONDARY_BORDER = "#D1D5DB"
+        self.SUCCESS = "#10B981"
+        self.SUCCESS_HOVER = "#059669"
 
         # --- Dicionário de Campos ---
         self.campos = {
@@ -44,26 +45,35 @@ class CadastroManualView(ctk.CTkFrame):
         }
         self._trace_active = True
 
-        # --- Layout Principal ---
+        # === LAYOUT PRINCIPAL ===
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        # --- Cabeçalho ---
+        # === CABEÇALHO ===
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        header_frame.grid(row=0, column=0, padx=24, pady=(24, 16), sticky="w")
+        header_frame.grid(row=0, column=0, sticky="ew", padx=24, pady=(24, 16))
+        
         self.title_label = ctk.CTkLabel(
             header_frame,
             text="Novo Colaborador",
             font=fonts.TITULO_SECAO,
-            text_color=TEXT_PRIMARY,
+            text_color=self.TEXT_PRIMARY,
         )
-        self.title_label.pack(anchor="w")
+        self.title_label.pack(anchor="w", pady=(0, 4))
+        
+        self.subtitle_label = ctk.CTkLabel(
+            header_frame,
+            text="Preencha os dados abaixo para cadastrar um novo colaborador.",
+            font=fonts.SUBTITULO,
+            text_color=self.TEXT_SECONDARY,
+        )
+        self.subtitle_label.pack(anchor="w")
 
-        # --- Card Principal para o Formulário ---
+        # === CARD PRINCIPAL DO FORMULÁRIO ===
         form_container = ctk.CTkFrame(
             self,
-            fg_color=SURFACE,
-            border_color=BORDER,
+            fg_color=self.SURFACE,
+            border_color=self.BORDER,
             border_width=1,
             corner_radius=12,
         )
@@ -74,83 +84,167 @@ class CadastroManualView(ctk.CTkFrame):
         scrollable_frame = ctk.CTkScrollableFrame(
             form_container, fg_color="transparent"
         )
-        scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+        scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         scrollable_frame.grid_columnconfigure(1, weight=1)
 
-        icon_color = ctk.ThemeManager.theme["CTkButton"]["text_color"]
-        icon_color = icon_color[0] if ctk.get_appearance_mode() == "Light" else icon_color[1]
-        icon_calendar = fa.icon_to_image("calendar-alt", fill=icon_color, scale_to_height=16)
+        # === ÍCONE DO CALENDÁRIO ===
+        icon_calendar = fa.icon_to_image(
+            "calendar-alt", fill="#FFFFFF", scale_to_height=16
+        )
         
-        # --- L ÓGICA DO LOOP CORRIGIDA ---
-        for i, (label, var) in enumerate(self.campos.items()):
+        # === SEÇÃO: DADOS PRINCIPAIS ===
+        section_row = 0
+        
+        ctk.CTkLabel(
+            scrollable_frame,
+            text="Dados Principais",
+            font=fonts.LABEL_FONT,
+            text_color=self.TEXT_PRIMARY,
+        ).grid(row=section_row, column=0, columnspan=2, sticky="w", padx=20, pady=(20, 10))
+        
+        divider1 = ctk.CTkFrame(scrollable_frame, height=1, fg_color=self.BORDER_LIGHT)
+        divider1.grid(row=section_row+1, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 16))
+
+        # === CAMPOS DO FORMULÁRIO ===
+        main_fields = ["Nome", "Matrícula", "Cargo", "Setor", "Tipo de Escala", "Turno Específico", "Conselho (Opcional)"]
+        current_row = section_row + 2
+        
+        for label in main_fields:
+            var = self.campos[label]
+            
             ctk.CTkLabel(
-                scrollable_frame, text=f"{label}:", font=fonts.LABEL_FONT
-            ).grid(row=i, column=0, sticky="w", padx=20, pady=10)
+                scrollable_frame,
+                text=f"{label}:",
+                font=fonts.SUBTITULO,
+                text_color=self.TEXT_SECONDARY,
+            ).grid(row=current_row, column=0, sticky="w", padx=20, pady=(0, 12))
 
-            entry = None  # Inicializa a variável 'entry'
+            entry = None
 
-            if "Afastamento" in label and ("Início" in label or "Fim" in label):
-                date_frame = ctk.CTkFrame(scrollable_frame, fg_color="transparent")
-                date_frame.grid(row=i, column=1, padx=20, pady=10, sticky="ew")
-                date_frame.grid_columnconfigure(0, weight=1)
-                entry = ctk.CTkEntry(
-                    date_frame,
-                    textvariable=var,
-                    height=35,
-                    font=fonts.TEXTO_NORMAL,
-                    placeholder_text="DD/MM/AAAA",
-                )
-                entry.grid(row=0, column=0, sticky="ew")
-                var.trace_add(
-                    "write", lambda name, index, mode, v=var: self._format_date(v)
-                )
-                btn = ctk.CTkButton(
-                    date_frame,
-                    text="", # Sem texto
-                    image=icon_calendar,
-                    width=35, height=35,
-                    fg_color=PRIMARY, # Usa a cor azul do tema
-                    hover_color=PRIMARY_HOVER,
-                    command=lambda v=var: self._open_calendar(v)
-                )
-                btn.grid(row=0, column=1, padx=(5, 0))
-
-            elif label == "Tipo de Escala":
+            if label == "Tipo de Escala":
                 entry = ctk.CTkComboBox(
                     scrollable_frame,
                     variable=var,
                     values=db.get_distinct_escala_types(),
-                    height=35,
-                    font=fonts.TEXTO_NORMAL,
-                    button_color=PRIMARY,
-                    dropdown_hover_color=PRIMARY_HOVER
+                    height=36,
+                    font=fonts.SUBTITULO,
+                    button_color=self.PRIMARY,
+                    dropdown_hover_color=self.PRIMARY_HOVER,
+                    fg_color=self.BUTTON_SECONDARY,
+                    border_color=self.BUTTON_SECONDARY_BORDER,
+                    corner_radius=8,
                 )
             elif label == "Turno Específico":
                 entry = ctk.CTkComboBox(
                     scrollable_frame,
                     variable=var,
                     values=["", "Diurno 1", "Diurno 2", "Noturno 1", "Noturno 2"],
-                    height=35,
-                    font=fonts.TEXTO_NORMAL,
+                    height=36,
+                    font=fonts.SUBTITULO,
                     state="readonly",
-                    button_color=PRIMARY,
-                    dropdown_hover_color=PRIMARY_HOVER
+                    button_color=self.PRIMARY,
+                    dropdown_hover_color=self.PRIMARY_HOVER,
+                    fg_color=self.BUTTON_SECONDARY,
+                    border_color=self.BUTTON_SECONDARY_BORDER,
+                    corner_radius=8,
                 )
             else:
                 entry = ctk.CTkEntry(
                     scrollable_frame,
                     textvariable=var,
-                    height=35,
-                    font=fonts.TEXTO_NORMAL,
+                    height=36,
+                    font=fonts.SUBTITULO,
+                    fg_color=self.BUTTON_SECONDARY,
+                    border_color=self.BUTTON_SECONDARY_BORDER,
+                    corner_radius=8,
                 )
 
-            if not ("Afastamento" in label and ("Início" in label or "Fim" in label)):
-                entry.grid(row=i, column=1, padx=20, pady=12, sticky="ew")
+            entry.grid(row=current_row, column=1, padx=20, pady=(0, 12), sticky="ew")
 
             if label == "Matrícula":
                 self.matricula_entry = entry
+            
+            current_row += 1
 
-        # --- Botões de Ação ---
+        # === SEÇÃO: AFASTAMENTOS ===
+        ctk.CTkLabel(
+            scrollable_frame,
+            text="Afastamentos (Opcional)",
+            font=fonts.LABEL_FONT,
+            text_color=self.TEXT_PRIMARY,
+        ).grid(row=current_row, column=0, columnspan=2, sticky="w", padx=20, pady=(24, 10))
+        
+        divider2 = ctk.CTkFrame(scrollable_frame, height=1, fg_color=self.BORDER_LIGHT)
+        divider2.grid(row=current_row+1, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 16))
+        
+        current_row += 2
+
+        # Campos de afastamento
+        afastamento_fields = ["Início do Afastamento", "Fim do Afastamento", "Motivo do Afastamento"]
+        
+        for label in afastamento_fields:
+            var = self.campos[label]
+            
+            ctk.CTkLabel(
+                scrollable_frame,
+                text=f"{label}:",
+                font=fonts.SUBTITULO,
+                text_color=self.TEXT_SECONDARY,
+            ).grid(row=current_row, column=0, sticky="w", padx=20, pady=(0, 12))
+
+            if "Início" in label or "Fim" in label:
+                # Campo de data com botão de calendário
+                date_frame = ctk.CTkFrame(scrollable_frame, fg_color="transparent")
+                date_frame.grid(row=current_row, column=1, padx=20, pady=(0, 12), sticky="ew")
+                date_frame.grid_columnconfigure(0, weight=1)
+                
+                entry = ctk.CTkEntry(
+                    date_frame,
+                    textvariable=var,
+                    height=36,
+                    font=fonts.SUBTITULO,
+                    placeholder_text="DD/MM/AAAA",
+                    fg_color=self.BUTTON_SECONDARY,
+                    border_color=self.BUTTON_SECONDARY_BORDER,
+                    corner_radius=8,
+                )
+                entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+                
+                var.trace_add(
+                    "write", lambda name, index, mode, v=var: self._format_date(v)
+                )
+                
+                btn_calendar = ctk.CTkButton(
+                    date_frame,
+                    text="",
+                    image=icon_calendar,
+                    width=36,
+                    height=36,
+                    fg_color=self.PRIMARY,
+                    hover_color=self.PRIMARY_HOVER,
+                    corner_radius=8,
+                    command=lambda v=var: self._open_calendar(v)
+                )
+                btn_calendar.grid(row=0, column=1)
+            else:
+                # Campo de texto normal (Motivo)
+                entry = ctk.CTkEntry(
+                    scrollable_frame,
+                    textvariable=var,
+                    height=36,
+                    font=fonts.SUBTITULO,
+                    fg_color=self.BUTTON_SECONDARY,
+                    border_color=self.BUTTON_SECONDARY_BORDER,
+                    corner_radius=8,
+                )
+                entry.grid(row=current_row, column=1, padx=20, pady=(0, 12), sticky="ew")
+            
+            current_row += 1
+
+        # Espaço final
+        ctk.CTkLabel(scrollable_frame, text="").grid(row=current_row, column=0, pady=10)
+
+        # === BOTÕES DE AÇÃO ===
         button_frame = ctk.CTkFrame(self, fg_color="transparent")
         button_frame.grid(row=2, column=0, pady=(0, 24), padx=24, sticky="ew")
         button_frame.grid_columnconfigure((0, 1), weight=1)
@@ -159,54 +253,52 @@ class CadastroManualView(ctk.CTkFrame):
             button_frame,
             text="Salvar",
             command=self._save,
-            height=45,
+            height=44,
             font=fonts.BUTTON_FONT,
-            fg_color=PRIMARY,
-            hover_color=PRIMARY_HOVER,
+            fg_color=self.SUCCESS,
+            hover_color=self.SUCCESS_HOVER,
+            corner_radius=8,
         ).grid(row=0, column=0, padx=(0, 8), sticky="ew")
+        
         ctk.CTkButton(
             button_frame,
             text="Voltar",
             command=self.back_callback,
             height=44,
             font=fonts.BUTTON_FONT,
-            fg_color=BUTTON_SECONDARY,
-            hover_color=BUTTON_SECONDARY_HOVER,
-            text_color=TEXT_PRIMARY,
+            fg_color=self.BUTTON_SECONDARY,
+            hover_color=self.BUTTON_SECONDARY_HOVER,
+            text_color=self.TEXT_PRIMARY,
             border_width=1,
-            border_color=BUTTON_SECONDARY_BORDER,
+            border_color=self.BUTTON_SECONDARY_BORDER,
             corner_radius=8,
-            compound="left",
-            border_spacing=10,
         ).grid(row=0, column=1, padx=(8, 0), sticky="ew")
 
         if self.matricula_para_editar:
             self.load_data_for_editing()
 
     def load_data_for_editing(self):
-        """Busca os dados do colaborador no BD e preenche o formulário, tratando valores nulos."""
+        """Busca os dados do colaborador no BD e preenche o formulário."""
         self.title_label.configure(text="Editar Colaborador")
+        self.subtitle_label.configure(text="Atualize os dados do colaborador abaixo.")
+        
         data = db.get_collaborator_by_matricula(self.matricula_para_editar)
         if not data:
             messagebox.showerror("Erro", "Colaborador não encontrado.", parent=self)
             self.back_callback()
             return
 
-        # Preenche os campos de texto
+        # Preenche os campos
         self.campos["Nome"].set(data.get("nome") or "")
         self.campos["Matrícula"].set(data.get("matricula") or "")
         self.campos["Cargo"].set(data.get("cargo") or "")
         self.campos["Setor"].set(data.get("setor") or "")
         self.campos["Tipo de Escala"].set(data.get("escala") or "")
         self.campos["Turno Específico"].set(data.get("tipo_turno") or "")
-        self.campos["Conselho (Opcional)"].set(
-            data.get("conselho") or ""
-        )  # Corrigido aqui também
-        self.campos["Motivo do Afastamento"].set(
-            data.get("afastamento_motivo") or ""
-        )  # Corrigido aqui
+        self.campos["Conselho (Opcional)"].set(data.get("conselho") or "")
+        self.campos["Motivo do Afastamento"].set(data.get("afastamento_motivo") or "")
 
-        # Preenche os campos de data
+        # Preenche datas
         inicio = data.get("afastamento_inicio")
         fim = data.get("afastamento_fim")
         self.campos["Início do Afastamento"].set(
@@ -217,15 +309,14 @@ class CadastroManualView(ctk.CTkFrame):
         self.matricula_entry.configure(state="disabled")
 
     def _format_date(self, var):
+        """Formata automaticamente a data enquanto o usuário digita."""
         if not self._trace_active:
             return
         current_text = var.get()
         cleaned_text = "".join(filter(str.isdigit, current_text))[:8]
         formatted_text = ""
         if len(cleaned_text) > 4:
-            formatted_text = (
-                f"{cleaned_text[:2]}/{cleaned_text[2:4]}/{cleaned_text[4:]}"
-            )
+            formatted_text = f"{cleaned_text[:2]}/{cleaned_text[2:4]}/{cleaned_text[4:]}"
         elif len(cleaned_text) > 2:
             formatted_text = f"{cleaned_text[:2]}/{cleaned_text[2:]}"
         else:
@@ -235,6 +326,7 @@ class CadastroManualView(ctk.CTkFrame):
         self._trace_active = True
 
     def _open_calendar(self, string_var_to_update):
+        """Abre o calendário para seleção de data."""
         def update_var_callback(selected_date_obj):
             string_var_to_update.set(selected_date_obj.strftime("%d/%m/%Y"))
 
@@ -249,11 +341,10 @@ class CadastroManualView(ctk.CTkFrame):
         CTkCalendar(self, current_date=initial_date, callback=update_var_callback)
 
     def _save(self):
-        """Coleta os dados, valida, mapeia para o formato do BD e chama o callback."""
-        # 1. Coleta os dados brutos da interface do usuário
+        """Coleta os dados, valida e salva."""
         dados_ui = {key: var.get() for key, var in self.campos.items()}
 
-        # 2. Validações principais
+        # Validações
         if not dados_ui["Nome"] or not dados_ui["Matrícula"]:
             messagebox.showwarning(
                 "Campo Obrigatório",
@@ -275,7 +366,7 @@ class CadastroManualView(ctk.CTkFrame):
         except ValueError:
             messagebox.showerror(
                 "Formato Inválido",
-                "Uma das datas de afastamento está em formato inválido. Use DD/MM/AAAA.",
+                "Uma das datas está em formato inválido. Use DD/MM/AAAA.",
                 parent=self,
             )
             return
@@ -283,7 +374,7 @@ class CadastroManualView(ctk.CTkFrame):
         if fim_date and not inicio_date:
             messagebox.showerror(
                 "Erro de Lógica",
-                "A data de Fim do Afastamento não pode ser preenchida sem uma data de Início.",
+                "A data de Fim não pode ser preenchida sem uma data de Início.",
                 parent=self,
             )
             return
@@ -291,22 +382,19 @@ class CadastroManualView(ctk.CTkFrame):
         if inicio_date and fim_date and fim_date < inicio_date:
             messagebox.showerror(
                 "Erro de Lógica",
-                "A data de Fim do Afastamento não pode ser anterior à data de Início.",
+                "A data de Fim não pode ser anterior à data de Início.",
                 parent=self,
             )
             return
 
+        # Mapeia dados para o formato do BD
         dados_mapeados = {
             "nome": dados_ui.get("Nome"),
             "matricula": dados_ui.get("Matrícula"),
             "cargo": dados_ui.get("Cargo"),
             "setor": dados_ui.get("Setor"),
-            "escala": dados_ui.get(
-                "Tipo de Escala"
-            ),  # UI 'Tipo de Escala' -> DB 'escala'
-            "tipo_turno": dados_ui.get(
-                "Turno Específico"
-            ),  # UI 'Turno Específico' -> DB 'tipo_turno'
+            "escala": dados_ui.get("Tipo de Escala"),
+            "tipo_turno": dados_ui.get("Turno Específico"),
             "conselho": dados_ui.get("Conselho (Opcional)"),
             "afastamento_inicio": (
                 inicio_date.strftime("%Y-%m-%d") if inicio_date else None
@@ -315,7 +403,6 @@ class CadastroManualView(ctk.CTkFrame):
             "afastamento_motivo": dados_ui.get("Motivo do Afastamento"),
         }
 
-        # 4. Chama a função de callback com os dados já mapeados e prontos para o BD
         self.app_controller.on_save_colaborador(
             dados_mapeados, self.matricula_para_editar
         )
