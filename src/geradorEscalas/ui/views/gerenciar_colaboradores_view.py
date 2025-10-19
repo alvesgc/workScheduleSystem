@@ -54,23 +54,33 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
 
         # === ÍCONES ===
         icon_size = 16
-        self.icon_add = fa.icon_to_image("plus", fill="#FFFFFF", scale_to_height=icon_size)
-        self.icon_import = fa.icon_to_image("file-import", fill=self.TEXT_SECONDARY, scale_to_height=icon_size)
-        self.icon_edit = fa.icon_to_image("pencil-alt", fill="#FFFFFF", scale_to_height=icon_size)
-        self.icon_delete = fa.icon_to_image("trash-alt", fill="#FFFFFF", scale_to_height=icon_size)
-        self.icon_search = fa.icon_to_image("search", fill="#FFFFFF", scale_to_height=icon_size)
+        self.icon_add = fa.icon_to_image(
+            "plus", fill="#FFFFFF", scale_to_height=icon_size
+        )
+        self.icon_import = fa.icon_to_image(
+            "file-import", fill=self.TEXT_SECONDARY, scale_to_height=icon_size
+        )
+        self.icon_edit = fa.icon_to_image(
+            "pencil-alt", fill="#FFFFFF", scale_to_height=icon_size
+        )
+        self.icon_delete = fa.icon_to_image(
+            "trash-alt", fill="#FFFFFF", scale_to_height=icon_size
+        )
+        self.icon_search = fa.icon_to_image(
+            "search", fill="#FFFFFF", scale_to_height=icon_size
+        )
 
         # === CABEÇALHO ===
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
         header_frame.grid(row=0, column=0, sticky="ew", padx=24, pady=(24, 16))
-        
+
         ctk.CTkLabel(
             header_frame,
             text="Gerenciar Colaboradores",
             font=fonts.TITULO_SECAO,
             text_color=self.TEXT_PRIMARY,
         ).pack(anchor="w", pady=(0, 4))
-        
+
         ctk.CTkLabel(
             header_frame,
             text="Visualize, adicione, edite ou remova colaboradores do sistema.",
@@ -155,7 +165,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             corner_radius=12,
         )
         search_container.grid(row=2, column=0, sticky="ew", padx=24, pady=(0, 16))
-        
+
         search_inner = ctk.CTkFrame(search_container, fg_color="transparent")
         search_inner.pack(fill="x", padx=16, pady=12)
         search_inner.grid_columnconfigure(0, weight=1)
@@ -224,7 +234,9 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             if search_term:
                 msg_text = f"Nenhum resultado encontrado para '{search_term}'."
             elif invalid_rows is not None:
-                msg_text = "Todos os colaboradores da planilha foram importados com sucesso!"
+                msg_text = (
+                    "Todos os colaboradores da planilha foram importados com sucesso!"
+                )
 
             empty_label = ctk.CTkLabel(
                 self.table_frame,
@@ -330,10 +342,10 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             messagebox.showwarning(
                 "Nenhuma Seleção",
                 "Selecione um ou mais colaboradores para editar.",
-                parent=self
+                parent=self,
             )
             return
-        
+
         if len(matriculas_selecionadas) == 1:
             # Edição única
             self.app_controller.show_cadastro_manual_view(
@@ -343,10 +355,10 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             # Edição em lote
             dados_selecionados = []
             for record in self.table_data:
-                iid = str(record.get('matricula', ''))
+                iid = str(record.get("matricula", ""))
                 if iid in matriculas_selecionadas:
                     dados_selecionados.append(record)
-            
+
             self.app_controller.show_edicao_lote_view(dados_selecionados)
 
     def delete_selected(self):
@@ -359,7 +371,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
                 parent=self,
             )
             return
-        
+
         if messagebox.askyesno(
             "Confirmar Exclusão",
             f"Tem certeza que deseja excluir {len(matriculas)} colaborador(es)?",

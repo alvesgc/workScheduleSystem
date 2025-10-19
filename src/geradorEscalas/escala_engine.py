@@ -18,9 +18,10 @@ class GeradorEscalaEngine:
         intervalo = timedelta(hours=(horas_trabalho + horas_folga))
 
         try:
+            data_base_obj = date.fromisoformat(str(data_base))
             # Assume que o turno base começa às 07:00.
             data_atual = datetime.combine(
-                date.fromisoformat(str(data_base)), datetime.min.time().replace(hour=7)
+                data_base_obj, datetime.min.time().replace(hour=7)
             )
         except (ValueError, TypeError):
             return []
@@ -46,9 +47,14 @@ class GeradorEscalaEngine:
             ) + timedelta(days=1)
 
         while data_atual < limite_superior:
-            if data_atual.year == self.ano and data_atual.month == self.mes:
+            if (
+                data_atual.year == self.ano
+                and data_atual.month == self.mes
+                and data_atual.date() >= data_base_obj  
+            ):
                 inicios_de_turno.append(data_atual)
-            data_atual += intervalo
+
+                data_atual += intervalo
 
         return inicios_de_turno
 

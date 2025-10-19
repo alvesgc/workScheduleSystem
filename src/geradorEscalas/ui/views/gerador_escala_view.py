@@ -3,7 +3,7 @@ import os
 import customtkinter as ctk
 import tkinter.ttk as ttk
 from tkinter import filedialog, messagebox
-from datetime import datetime
+from datetime import date, datetime
 import tkfontawesome as fa
 from ..widgets import ctk_checklist_dropdown as checklist
 from ... import exporters
@@ -544,20 +544,28 @@ class GeradorEscalaView(ctk.CTkFrame):
 
             if tem_escala_critica:
                 tags_da_linha.append("critical_escala")
-
+                
+            escala_data_base = info.get("escala_data_base")
             valores_linha = [info.get("nome", matricula)]
+            
             for dia in range(1, 32):
-                if dia > num_dias_no_mes:
-                    valores_linha.append("")
-                    continue
-
-                valor_celula = "F"
-                if dia in dias_de_trabalho:
-                    esta_afastado = dias_de_trabalho[dia].get("em_afastamento", False)
-                    valor_celula = "X(A)" if esta_afastado else "X"
-
+                valor_celula = '' # O padrão agora é VAZIO
+                
+                if dia <= num_dias_no_mes:
+                    data_do_dia = date(ano, mes_numero, dia)
+                    
+                    # Só preenche com X ou F se o dia for posterior ou igual à data base
+                    # ou se não houver data base (ex: Diarista)
+                    if not escala_data_base or data_do_dia >= escala_data_base:
+                        valor_celula = "F" # O padrão dentro do ciclo é Folga
+                        if dia in dias_de_trabalho:
+                            turno_info = dias_de_trabalho[dia]
+                            esta_afastado = turno_info.get("em_afastamento", False)
+                            valor_celula = "X(A)" if esta_afastado else "X"
+                
                 valores_linha.append(valor_celula)
-
+            
+            # Insere a linha completa de uma vez
             self.tree.insert("", "end", values=valores_linha, tags=tuple(tags_da_linha))
             row_count += 1
 
