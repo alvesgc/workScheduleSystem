@@ -172,7 +172,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
 
         self.search_entry = ctk.CTkEntry(
             search_inner,
-            placeholder_text="Pesquisar por nome ou matrícula...",
+            placeholder_text="Pesquisar por nome, matrícula, cargo ou setor...",
             font=fonts.SUBTITULO,
             height=36,
             fg_color=self.BUTTON_SECONDARY,

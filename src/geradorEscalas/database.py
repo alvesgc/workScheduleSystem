@@ -215,9 +215,9 @@ def get_all_collaborators_dataframe(search_term=None):
     params = {}
 
     if search_term:
-        query_str += " AND (nome LIKE :term OR matricula LIKE :term)"
+        query_str += " AND (nome LIKE :term OR matricula LIKE :term OR cargo LIKE :term OR setor LIKE :term)"
         params["term"] = f"%{search_term}%"
-
+        
     query_str += " ORDER BY nome"
 
     try:
@@ -335,10 +335,12 @@ def get_dashboard_stats():
 
 def get_upcoming_leaves(days_ahead=30):
     """Busca TODOS os afastamentos que começarão nos próximos X dias a partir de hoje."""
-    if not engine: return []
-    
+    if not engine:
+        return []
+
     with engine.connect() as connection:
-        query = text("""
+        query = text(
+            """
             SELECT nome, afastamento_inicio, afastamento_fim
             FROM colaboradores
             WHERE ativo = 1
@@ -346,10 +348,12 @@ def get_upcoming_leaves(days_ahead=30):
             AND afastamento_fim >= CURDATE()
             AND afastamento_inicio <= DATE_ADD(CURDATE(), INTERVAL :days DAY)
             ORDER BY afastamento_inicio ASC
-        """)
+        """
+        )
         # Usa .fetchall() para pegar TODAS as linhas, não apenas a primeira
         result = connection.execute(query, {"days": days_ahead}).fetchall()
         return [row._asdict() for row in result]
+
 
 def batch_update_collaborators(matriculas, field_to_update, new_value):
     """Atualiza um campo específico para uma lista de colaboradores de uma só vez."""
@@ -423,11 +427,15 @@ def get_all_active_collaborators(filtros=None):
             params.update(
                 {f"mat_{i}": val for i, val in enumerate(filtros["matriculas"])}
             )
-            
+
         if filtros.get("setores"):
-            in_placeholders = ', '.join([f':setor_{i}' for i in range(len(filtros["setores"]))])
+            in_placeholders = ", ".join(
+                [f":setor_{i}" for i in range(len(filtros["setores"]))]
+            )
             query_str += f" AND setor IN ({in_placeholders})"
-            params.update({f'setor_{i}': val for i, val in enumerate(filtros["setores"])})
+            params.update(
+                {f"setor_{i}": val for i, val in enumerate(filtros["setores"])}
+            )
     query_str += " ORDER BY nome"
 
     with engine.connect() as connection:
