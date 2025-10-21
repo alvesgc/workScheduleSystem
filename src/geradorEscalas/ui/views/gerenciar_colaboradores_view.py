@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 import os
 import tkfontawesome as fa
 from ..widgets.CTkAdvancedTable import CTkAdvancedTable
-from ...utils import resource_path
+
 
 class GerenciarColaboradoresView(ctk.CTkFrame):
     def __init__(self, master, app_controller, data_to_load=None):
@@ -18,6 +18,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
         self.selected_matriculas = set()
         self.table_data = []
         self.hovered_item = None
+        self.select_all_var = ctk.BooleanVar(value=False)
 
         # === PALETA DE CORES HIERÁRQUICA ===
         self.PRIMARY = "#0078D7"
@@ -35,7 +36,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
 
         # --- Carregar Imagens dos Checkboxes ---
         try:
-            icon_path = resource_path(os.path.join("src", "geradorEscalas", "assets", "icons"))
+            icon_path = "src/geradorEscalas/assets/icons"
             pil_checked = Image.open(
                 os.path.join(icon_path, "checkbox_checked.png")
             ).resize((16, 16), Image.Resampling.LANCZOS)
@@ -172,7 +173,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
 
         self.search_entry = ctk.CTkEntry(
             search_inner,
-            placeholder_text="Pesquisar por nome, matrícula, cargo ou setor...",
+            placeholder_text="Pesquisar por nome ou matrícula...",
             font=fonts.SUBTITULO,
             height=36,
             fg_color=self.BUTTON_SECONDARY,
@@ -205,11 +206,43 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             corner_radius=12,
         )
         self.table_container.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0, 24))
-        self.table_container.grid_rowconfigure(0, weight=1)
+        self.table_container.grid_rowconfigure(1, weight=1)
         self.table_container.grid_columnconfigure(0, weight=1)
 
+        # === HEADER DA TABELA COM CHECKBOX ===
+        table_header = ctk.CTkFrame(self.table_container, fg_color="transparent")
+        table_header.grid(row=0, column=0, sticky="ew", padx=20, pady=(16, 8))
+
+        # Checkbox customizado com imagens
+        self.select_all_frame = ctk.CTkFrame(
+            table_header, fg_color="transparent", cursor="hand2"
+        )
+        self.select_all_frame.pack(side="left")
+        self.select_all_frame.bind("<Button-1>", lambda e: self.on_select_all_toggle())
+
+        self.select_all_image_label = ctk.CTkLabel(
+            self.select_all_frame, text="", image=self.img_unchecked, cursor="hand2"
+        )
+        self.select_all_image_label.pack(side="left", padx=(0, 8))
+        self.select_all_image_label.bind(
+            "<Button-1>", lambda e: self.on_select_all_toggle()
+        )
+
+        self.select_all_text_label = ctk.CTkLabel(
+            self.select_all_frame,
+            text="Selecionar Todos",
+            font=fonts.SUBTITULO,
+            text_color=self.TEXT_SECONDARY,
+            cursor="hand2",
+        )
+        self.select_all_text_label.pack(side="left")
+        self.select_all_text_label.bind(
+            "<Button-1>", lambda e: self.on_select_all_toggle()
+        )
+
+        # === FRAME DA TABELA ===
         self.table_frame = ctk.CTkFrame(self.table_container, fg_color="transparent")
-        self.table_frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        self.table_frame.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
         self.table_frame.grid_rowconfigure(0, weight=1)
         self.table_frame.grid_columnconfigure(0, weight=1)
 
@@ -247,6 +280,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             empty_label.place(relx=0.5, rely=0.5, anchor="center")
 
             self.update_context_buttons()
+            self._update_select_all_checkbox_state()
             return
 
         df.fillna("", inplace=True)
@@ -304,6 +338,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
 
         self.tree.bind("<Button-1>", self.on_row_click)
         self.update_context_buttons()
+        self._update_select_all_checkbox_state()
 
     def on_row_click(self, event):
         """Gerencia cliques nos checkboxes."""
@@ -324,6 +359,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             self.tree.selection_set([])
 
         self.update_context_buttons()
+        self._update_select_all_checkbox_state()
 
     def update_context_buttons(self):
         """Habilita/desabilita botões baseado na seleção."""
@@ -383,3 +419,70 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
         """Executa a busca."""
         search_term = self.search_entry.get()
         self.update_table(search_term=search_term)
+
+    def on_select_all_toggle(self):
+        """Seleciona ou desmarca todos os colaboradores."""
+        if not hasattr(self, "tree") or not self.tree.get_children():
+            return
+
+        all_item_ids = self.tree.get_children()
+
+        # Alterna o estado
+        self.select_all_var.set(not self.select_all_var.get())
+
+        if self.select_all_var.get():
+            # Marca todos
+            self.select_all_image_label.configure(image=self.img_checked)
+            for item_id in all_item_ids:
+                if item_id not in self.selected_matriculas:
+                    self.selected_matriculas.add(item_id)
+                    self.tree.item(item_id, image=self.img_checked)
+        else:
+            # Desmarca todos
+            self.select_all_image_label.configure(image=self.img_unchecked)
+            for item_id in all_item_ids:
+                if item_id in self.selected_matriculas:
+                    self.selected_matriculas.remove(item_id)
+                    self.tree.item(item_id, image=self.img_unchecked)
+
+        # Atualiza seleção visual
+        if self.selected_matriculas:
+            self.tree.selection_set(list(self.selected_matriculas))
+        else:
+            self.tree.selection_set([])
+
+        self.update_context_buttons()
+
+    def _update_select_all_checkbox_state(self):
+        """Atualiza o estado do checkbox 'Selecionar Todos'."""
+        if not hasattr(self, "tree") or not self.tree.get_children():
+            if self.select_all_var.get() != False:
+                self.select_all_var.set(False)
+                self.select_all_image_label.configure(image=self.img_unchecked)
+            self.select_all_frame.configure(cursor="arrow")
+            self.select_all_image_label.configure(cursor="arrow")
+            self.select_all_text_label.configure(
+                cursor="arrow", text_color=self.TEXT_TERTIARY
+            )
+            return
+
+        # Configura cursor apenas se necessário
+        if self.select_all_frame.cget("cursor") != "hand2":
+            self.select_all_frame.configure(cursor="hand2")
+            self.select_all_image_label.configure(cursor="hand2")
+            self.select_all_text_label.configure(
+                cursor="hand2", text_color=self.TEXT_SECONDARY
+            )
+
+        total_items = len(self.tree.get_children())
+        selected_items = len(self.selected_matriculas)
+
+        # Atualiza apenas se o estado mudou
+        should_be_checked = total_items > 0 and selected_items == total_items
+
+        if self.select_all_var.get() != should_be_checked:
+            self.select_all_var.set(should_be_checked)
+            if should_be_checked:
+                self.select_all_image_label.configure(image=self.img_checked)
+            else:
+                self.select_all_image_label.configure(image=self.img_unchecked)
