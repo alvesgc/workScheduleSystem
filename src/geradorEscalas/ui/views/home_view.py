@@ -9,7 +9,6 @@ class HomeView(ctk.CTkFrame):
     def __init__(self, master, app_controller,  main_view, **kwargs):
         super().__init__(master, fg_color="#F5F6FA")
         self.app_controller = app_controller
-
         stats = db.get_dashboard_stats()
         upcoming_leaves = db.get_upcoming_leaves()
 

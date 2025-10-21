@@ -1,4 +1,5 @@
 import os
+import tksvg
 import re
 import shutil
 import customtkinter as ctk
@@ -8,8 +9,8 @@ import bcrypt
 import pandas as pd
 from PIL import Image
 import numpy as np
-from . import fonts
 import tkfontawesome as fa
+from .utils import resource_path
 
 # Importa as classes de "view" (que são Frames) e os módulos de apoio
 from .ui.views import (
@@ -19,7 +20,6 @@ from .ui.views import (
 )
 from . import database as db
 from . import fonts
-
 # --- CONFIGURAÇÕES GLOBAIS ---
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
@@ -98,10 +98,11 @@ class App(ctk.CTk):
         style.theme_use("clam")
         fonts.init_fonts()
 
+
+# Este comando vai imprimir o caminho exato da pasta da biblioteca tksvg
+        print(os.path.dirname(tksvg.__file__))
         try:
-            font_path = os.path.join(
-                os.path.dirname(__file__), "assets", "fonts", "fa-solid.otf"
-            )
+            font_path = resource_path(os.path.join("src", "geradorEscalas", "assets", "fonts", "fa-solid.otf"))
             fa.set_font_path(font_path)
             print("Fonte FontAwesome carregada com sucesso.")
         except Exception as e:

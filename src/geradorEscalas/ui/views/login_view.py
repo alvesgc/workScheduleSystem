@@ -1,7 +1,8 @@
+import os
 import customtkinter as ctk
 from ... import fonts
 from PIL import Image
-
+from ...utils import resource_path
 
 class LoginView(ctk.CTkFrame):
     def __init__(self, master, login_callback, register_callback):
@@ -45,9 +46,7 @@ class LoginView(ctk.CTkFrame):
 
         # --- LOGO DA EMPRESA ---
         try:
-            logo_image_path = (
-                "src/geradorEscalas/assets/logo.png"  # Verifique o caminho
-            )
+            logo_image_path = resource_path(os.path.join("src", "geradorEscalas", "assets", "logo.png"))
             pil_image = Image.open(logo_image_path)
             logo_image = ctk.CTkImage(pil_image, size=(120, 32))
 
@@ -55,7 +54,7 @@ class LoginView(ctk.CTkFrame):
             logo_label.pack(pady=(0, 20), anchor="center")
         except FileNotFoundError:
             ctk.CTkLabel(
-                main_frame, text="Nome da Empresa", font=fonts.TITULO_APP
+                main_frame, text="Netcode", font=fonts.TITULO_SECAO
             ).pack(pady=(0, 20))
 
         # --- Títulos ---

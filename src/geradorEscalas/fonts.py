@@ -1,6 +1,6 @@
 import customtkinter as ctk
 import os
-
+from .utils import resource_path
 # --- VARIÁVEIS GLOBAIS PARA GUARDAR AS FONTES ---
 TEXTO_NORMAL = None
 LABEL_FONT = None
@@ -19,10 +19,10 @@ def init_fonts():
 
     try:
         # Caminho para a pasta de fontes
-        font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts")
+        font_path = resource_path(os.path.join("src", "geradorEscalas", "assets", "fonts"))
         
-        poppins_regular_path = os.path.join(font_path, "Poppins-Regular.ttf")
-        poppins_bold_path = os.path.join(font_path, "Poppins-Bold.ttf")
+        poppins_regular_path = resource_path(os.path.join("assets", "fonts", "Poppins-Regular.ttf"))
+        poppins_bold_path = resource_path(os.path.join("assets", "fonts", "Poppins-Bold.ttf"))
 
         # --- Carregando as fontes Poppins ---
         ctk.FontManager.load_font(poppins_regular_path)

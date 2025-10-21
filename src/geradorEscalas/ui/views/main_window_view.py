@@ -4,6 +4,7 @@ import tkfontawesome as fa
 from tkinter import messagebox
 from PIL import Image as PIL_Image, ImageOps
 from ... import fonts
+from ...utils import resource_path
 
 from .home_view import HomeView
 from .gerenciar_colaboradores_view import GerenciarColaboradoresView
@@ -97,7 +98,7 @@ class MainView(ctk.CTkFrame):
         }
 
         # === LOGO  ===
-        logo_path = "src/geradorEscalas/assets/logo.png"
+        logo_path = resource_path("geradorEscalas/assets/logo.png")
 
         try:
             pil_logo = PIL_Image.open(logo_path)
@@ -245,6 +246,7 @@ class MainView(ctk.CTkFrame):
 
     def show_home_view(self):
         self._show_content(HomeView, app_controller=self.app_controller, main_view=self)
+        
 
     def show_escala_wizard(self):
         self._show_content(GeradorEscalaView, app_controller=self.app_controller)

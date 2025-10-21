@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 import os
 import tkfontawesome as fa
 from ..widgets.CTkAdvancedTable import CTkAdvancedTable
-
+from ...utils import resource_path
 
 class GerenciarColaboradoresView(ctk.CTkFrame):
     def __init__(self, master, app_controller, data_to_load=None):
@@ -35,7 +35,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
 
         # --- Carregar Imagens dos Checkboxes ---
         try:
-            icon_path = "src/geradorEscalas/assets/icons"
+            icon_path = resource_path(os.path.join("src", "geradorEscalas", "assets", "icons"))
             pil_checked = Image.open(
                 os.path.join(icon_path, "checkbox_checked.png")
             ).resize((16, 16), Image.Resampling.LANCZOS)
