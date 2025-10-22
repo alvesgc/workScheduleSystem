@@ -33,21 +33,50 @@ def exportar_para_excel(dados_escala, ano, mes, caminho_arquivo):
 
     for matricula, info in dados_escala.items():
         linha = {"Colaborador": info.get("nome", matricula)}
-        for dia_num_str in colunas_dias:
-            linha[dia_num_str] = ""
 
-        for turno in info.get("dias", []):
-            dia = turno.get("dia")
-            tipo_turno = turno.get("turno", "").upper()
-            esta_afastado = turno.get("em_afastamento", False)
-            valor_celula = f"{tipo_turno}(A)" if esta_afastado else tipo_turno
+        # Pega os dados necessários para a lógica
+        dias_trabalho = {turno["dia"]: turno for turno in info.get("dias", [])}
+        escala_data_base = info.get("escala_data_base")  # Pega a data de início
 
-            if dia and 1 <= dia <= num_dias:
-                linha[str(dia)] = valor_celula
+        # --- LÓGICA CORRIGIDA ---
+        # Loop por todos os dias do mês
+        for dia_num in range(1, num_dias + 1):
+            dia_num_str = str(dia_num)
+            valor_celula = ""  # O padrão é VAZIO (antes da escala começar)
+
+            try:
+                # Usamos datetime.date para comparar com a data_base
+                data_do_dia = datetime(ano, mes, dia_num).date()
+            except ValueError:
+                data_do_dia = None  # Lida com datas inválidas (raro)
+
+            if data_do_dia:
+                # Verifica se a escala já começou
+                if not escala_data_base or data_do_dia >= escala_data_base:
+                    # Se a escala começou, o padrão é Folga
+                    valor_celula = "F"
+
+                    # Verifica se é um dia de trabalho
+                    if dia_num in dias_trabalho:
+                        turno_info = dias_trabalho[dia_num]
+                        tipo_turno = turno_info.get("turno", "X").upper()
+                        esta_afastado = turno_info.get("em_afastamento", False)
+                        # Sobrescreve 'F' com 'X' ou 'X(A)' [cite: 17]
+                        valor_celula = (
+                            f"{tipo_turno}(A)" if esta_afastado else tipo_turno
+                        )
+
+            linha[dia_num_str] = valor_celula
+        # --- FIM DA CORREÇÃO ---
 
         dados_para_df.append(linha)
 
     df = pd.DataFrame(dados_para_df)
+
+    # Garante a ordem correta das colunas (embora o loop já deva fazer isso)
+    colunas_ordenadas = ["Colaborador"] + colunas_dias
+    df = df.reindex(columns=colunas_ordenadas)
+
     df.set_index("Colaborador", inplace=True)
 
     df.to_excel(caminho_arquivo, sheet_name=f"Escala {mes_nome} {ano}")
@@ -95,7 +124,7 @@ def _determinar_sequencia(info_colab):
 
 def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
     """Gera uma tabela formatada da escala e a salva em um arquivo PDF profissional,
-    agrupando colaboradores por tipo de escala."""
+    agrupando colaboradores por tipo de escala e turno (Diurno/Noturno)."""
     meses_nomes = [
         "JANEIRO",
         "FEVEREIRO",
@@ -116,17 +145,34 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
     # Mapeamento dos dias da semana
     dias_semana_abrev = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
 
-    # --- MUDANÇA 1: Agrupamento dos dados ---
-    # Em vez de uma lista, criamos um dicionário de grupos
+    # --- MUDANÇA 1: Agrupamento com base no Tipo_turno ---
     grupos_de_escala = {}
     for matricula, info in dados_escala.items():
-        # Usamos 'info.get("escala")' como a chave do grupo
-        escala_nome = info.get("escala", "Sem Escala Definida")
-        if escala_nome not in grupos_de_escala:
-            grupos_de_escala[escala_nome] = []
-        grupos_de_escala[escala_nome].append((matricula, info))
 
-    # --- Criação do Documento (mesmo de antes) ---
+        # Pega o tipo de escala (ex: "12x36")
+        escala_tipo = info.get("escala", "N/A").upper()
+
+        # Pega o turno (ex: "Diurno 1", "Noturno 2")
+        tipo_turno_bruto = info.get("tipo_turno", "")
+
+        escala_nome_grupo = ""  # Esta será a chave do grupo
+
+        if tipo_turno_bruto:
+            # Extrai "DIURNO" ou "NOTURNO" (remove "1", "2", etc.)
+            tipo_turno_limpo = tipo_turno_bruto.split(" ")[0].upper()
+            escala_nome_grupo = (
+                f"{escala_tipo} - {tipo_turno_limpo}"  # ex: "12X36 - DIURNO"
+            )
+        else:
+            # Fallback para escalas que não têm turno (ex: "DIARISTA")
+            escala_nome_grupo = escala_tipo  # ex: "DIARISTA"
+
+        if escala_nome_grupo not in grupos_de_escala:
+            grupos_de_escala[escala_nome_grupo] = []
+        grupos_de_escala[escala_nome_grupo].append((matricula, info))
+    # --- FIM DA MUDANÇA ---
+
+    # --- Criação do Documento ---
     doc = SimpleDocTemplate(
         caminho_arquivo,
         pagesize=landscape(letter),
@@ -137,7 +183,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
     )
     elementos = []
 
-    # --- Estilos (mesmo de antes) ---
+    # --- Estilos ---
     styles = getSampleStyleSheet()
     style_titulo = ParagraphStyle(
         "CustomTitle",
@@ -157,17 +203,18 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         alignment=TA_LEFT,
         fontName="Helvetica",
     )
-    
-    # --- Título Principal (mesmo de antes) ---
+
+    # --- Título Principal ---
     titulo_html = f'ESCALA <font color="red">UMPA STA. LUZIA</font> - {mes_nome} {ano}'
     elementos.append(Paragraph(titulo_html, style_titulo))
-    elementos.append(Spacer(1, 0.1 * inch)) # Adiciona um espaço
+    elementos.append(Spacer(1, 0.1 * inch))
 
-    # --- MUDANÇA 2: Definição dos Cabeçalhos (seguindo a imagem) ---
-    # Ordem: NOME, SETOR, MATRÍCULA (diferente do seu código original)
-    
+    # --- Definição dos Cabeçalhos (Ordem: NOME, SETOR, MATRÍCULA) ---
+
     # Linha 1: Números dos dias
-    cabecalho_dias = ["NOME", "SETOR", "MATRÍCULA"] + [str(i) for i in range(1, num_dias + 1)] + [""]
+    cabecalho_dias = (
+        ["NOME", "SETOR", "MATRÍCULA"] + [str(i) for i in range(1, num_dias + 1)] + [""]
+    )
 
     # Linha 2: Dias da semana abreviados
     cabecalho_semana = ["", "", ""]  # Células vazias para NOME, SETOR, MATRÍCULA
@@ -176,7 +223,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         cabecalho_semana.append(dias_semana_abrev[dia_semana_num])
     cabecalho_semana.append("")  # Coluna extra vazia
 
-    # --- MUDANÇA 3: Definição das Larguras (seguindo a imagem) ---
+    # --- Definição das Larguras ---
     largura_col_nome = 2.2 * inch
     largura_setor = 1.2 * inch
     largura_matricula = 0.8 * inch
@@ -185,58 +232,69 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         - largura_col_nome
         - largura_setor
         - largura_matricula
-        - 1 * inch # Margens + coluna extra
+        - 1 * inch  # Margens + coluna extra
     )
     largura_col_dia = largura_disponivel / (num_dias + 1)
 
-    # Nova ordem de larguras
     larguras_colunas = [largura_col_nome, largura_setor, largura_matricula] + [
         largura_col_dia
     ] * (num_dias + 1)
 
+    # --- Loop principal para criar blocos ---
 
-    # --- MUDANÇA 4: Loop principal para criar blocos ---
-    
-    # Ordena os grupos pelo nome da escala (ex: "DIURNO" antes de "NOTURNO")
-    for escala_nome, colaboradores_do_grupo in sorted(grupos_de_escala.items()):
-        
+    # Ordena os grupos pelo nome da escala (ex: "DIURNO 12X36" antes de "NOTURNO 12X36")
+    for escala_nome_grupo, colaboradores_do_grupo in sorted(grupos_de_escala.items()):
+
         # Adiciona os títulos do bloco (ESCALA e FUNÇÃO)
-        elementos.append(Paragraph(f"<b>ESCALA:</b> {escala_nome.upper()}", style_info))
+        # O 'escala_nome_grupo' já vem formatado (ex: "DIURNO 12X36")
+        elementos.append(Paragraph(f"<b>ESCALA:</b> {escala_nome_grupo}", style_info))
         elementos.append(Paragraph(f"<b>FUNÇÃO:</b> ASG", style_info))
         elementos.append(Spacer(1, 0.1 * inch))
 
-        # --- Ordenação interna do grupo (PAR/ÍMPAR, igual ao seu código) ---
+        # --- Ordenação interna do grupo (PAR/ÍMPAR) ---
         dados_ordenados_grupo = []
         for matricula, info in colaboradores_do_grupo:
             sequencia = _determinar_sequencia(info)
             dados_ordenados_grupo.append((matricula, info, sequencia))
-        
-        # Ordena por sequência (0=PAR, 1=ÍMPAR, 2=Outros) e depois por nome
+
         dados_ordenados_grupo.sort(key=lambda x: (x[2], x[1].get("nome", "")))
 
-        # --- Preparação dos dados da tabela para ESTE GRUPP ---
+        # --- Preparação dos dados da tabela para ESTE GRUPO ---
         dados_tabela_grupo = [cabecalho_dias, cabecalho_semana]
 
         for matricula, info, _ in dados_ordenados_grupo:
-            
-            # --- REQUISITO 1: USA O SETOR REAL ---
-            setor_real = info.get("setor", "") # Pega o setor real
-            
-            # Nova ordem da linha: NOME, SETOR, MATRÍCULA
+
+            setor_real = info.get("setor", "")  # Pega o setor real
+
             linha = [
                 info.get("nome", matricula),
-                setor_real, # <--- Corrigido
+                setor_real,
                 str(matricula),
             ]
 
             dias_trabalho = {turno["dia"]: turno for turno in info.get("dias", [])}
-
+            escala_data_base = info.get("escala_data_base")
             for dia_num in range(1, num_dias + 1):
-                turno_info = dias_trabalho.get(dia_num)
-                if turno_info:
-                    tipo_turno = turno_info.get("turno", "").upper()
-                    esta_afastado = turno_info.get("em_afastamento", False)
-                    valor_celula = f"{tipo_turno}(A)" if esta_afastado else tipo_turno
+                valor_celula = ""
+                try:
+                    data_do_dia = datetime(ano, mes, dia_num).date()
+                except ValueError:
+                    data_do_dia = None
+
+                if data_do_dia:
+                    # Se a escala já começou (ou não tem data, ex: Diarista)
+                    if not escala_data_base or data_do_dia >= escala_data_base:
+                        valor_celula = "F"  # Padrão é Folga
+
+                        turno_info = dias_trabalho.get(dia_num)
+                        if turno_info:
+                            tipo_turno = turno_info.get("turno", "X").upper()
+                            esta_afastado = turno_info.get("em_afastamento", False)
+                            # Sobrescreve 'F' com 'X' ou 'X(A)'
+                            valor_celula = (
+                                f"{tipo_turno}(A)" if esta_afastado else tipo_turno
+                            )
+
                     linha.append(valor_celula)
                 else:
                     linha.append("")
@@ -247,40 +305,39 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         # Cria o objeto Tabela para este grupo
         tabela_grupo = Table(dados_tabela_grupo, colWidths=larguras_colunas)
 
-        # --- MUDANÇA 5: Estilização (cores e alinhamento ajustados) ---
+        # --- Estilização (com cores verdes da imagem) ---
         style = TableStyle(
             [
-                # Cabeçalho (Linha 0) - Cor VERDE (para bater com a imagem)
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#C6E0B4")), # Verde
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.black), # Texto preto
+                # Cabeçalho (Linha 0)
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#C6E0B4")),  # Verde
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("FONTSIZE", (0, 0), (-1, 0), 8),
                 ("ALIGN", (0, 0), (-1, 0), "CENTER"),
                 ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
-                
-                # Dias da Semana (Linha 1) - Cor VERDE CLARO
-                ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#E2EFD9")), # Verde claro
+                # Dias da Semana (Linha 1)
+                (
+                    "BACKGROUND",
+                    (0, 1),
+                    (-1, 1),
+                    colors.HexColor("#E2EFD9"),
+                ),  # Verde claro
                 ("TEXTCOLOR", (0, 1), (-1, 1), colors.black),
                 ("FONTNAME", (0, 1), (-1, 1), "Helvetica"),
                 ("FONTSIZE", (0, 1), (-1, 1), 7),
                 ("ALIGN", (0, 1), (-1, 1), "CENTER"),
                 ("VALIGN", (0, 1), (-1, 1), "MIDDLE"),
-                
                 # Corpo da tabela (Linhas 2+)
                 ("FONTNAME", (0, 2), (-1, -1), "Helvetica"),
                 ("FONTSIZE", (0, 2), (-1, -1), 7),
-                
-                # --- Ajuste de Alinhamento (NOME, SETOR, MATRÍCULA) ---
-                ("ALIGN", (0, 2), (0, -1), "LEFT"),    # NOME à esquerda
+                # Alinhamento (NOME, SETOR, MATRÍCULA)
+                ("ALIGN", (0, 2), (0, -1), "LEFT"),  # NOME à esquerda
                 ("ALIGN", (1, 2), (1, -1), "CENTER"),  # SETOR centralizado
                 ("ALIGN", (2, 2), (2, -1), "CENTER"),  # MATRÍCULA centralizada
                 ("ALIGN", (3, 2), (-1, -1), "CENTER"),  # Dias centralizados
-                
                 ("VALIGN", (0, 2), (-1, -1), "MIDDLE"),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
                 ("LINEBELOW", (0, 1), (-1, 1), 1, colors.black),
-                
-                # Padding (mesmo de antes)
                 ("TOPPADDING", (0, 0), (-1, -1), 3),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                 ("LEFTPADDING", (0, 0), (-1, -1), 4),
@@ -299,8 +356,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         for dia_num in range(1, num_dias + 1):
             if weekday(ano, mes, dia_num) >= 5:
                 # +3 colunas de offset: NOME, SETOR, MATRÍCULA
-                # (Índice 0, 1, 2). O Dia 1 está no índice 3.
-                col_index = dia_num + 2 
+                col_index = dia_num + 2
                 style.add(
                     "BACKGROUND",
                     (col_index, 0),
