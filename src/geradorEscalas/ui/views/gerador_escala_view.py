@@ -557,13 +557,9 @@ class GeradorEscalaView(ctk.CTkFrame):
                 if ano == today.year and mes == today.month and dia == today.day:
                     self.tree.heading(str(dia), text=f"[{dia}]")
 
+
     def _preencher_tabela(self, dados_escala):
         """Preenche a tabela com 'X' para trabalho e 'F' para folga."""
-        
-        # REMOVIDO: Este loop não é necessário se _setup_treeview
-        # já cria uma tabela nova.
-        # for item in self.tree.get_children():
-        #     self.tree.delete(item)
 
         mes_numero = self.meses_map[self.mes_var.get()]
         ano = int(self.ano_var.get())
@@ -589,34 +585,44 @@ class GeradorEscalaView(ctk.CTkFrame):
 
             escala_data_base = info.get("escala_data_base")
             
-            # 1. Começa a lista de valores SÓ com o nome
+            # DEBUG - Imprima para ver os valores
+            print(f"\n=== Matrícula: {matricula} ===")
+            print(f"Nome: {info.get('nome', matricula)}")
+            print(f"escala_data_base: {escala_data_base} (tipo: {type(escala_data_base)})")
+            print(f"Mês/Ano visualizado: {mes_numero}/{ano}")
+            print(f"Dias de trabalho: {list(dias_de_trabalho.keys())}")
+            
             valores_linha = [info.get("nome", matricula)]
             
-            # 2. Faz o loop dos dias ANTES de inserir
             for dia in range(1, 32):
-                valor_celula = ""  # O padrão agora é VAZIO
+                valor_celula = ""  # Padrão é VAZIO
 
                 if dia <= num_dias_no_mes:
                     data_do_dia = date(ano, mes_numero, dia)
 
-                    if not escala_data_base or data_do_dia >= escala_data_base:
-                        valor_celula = "F"  # O padrão dentro do ciclo é Folga
+                    # DEBUG para os primeiros 3 dias
+                    if dia <= 3:
+                        print(f"Dia {dia}: data_do_dia={data_do_dia}, escala_data_base={escala_data_base}, comparação={data_do_dia >= escala_data_base if escala_data_base else 'N/A'}")
+
+                    # CORREÇÃO: Só aplica F/X se houver data base E o dia for >= data base
+                    if escala_data_base and data_do_dia >= escala_data_base:
+                        # Dentro do período válido: padrão é Folga
+                        valor_celula = "F"
+                        
+                        # Se tem trabalho neste dia, marca como X
                         if dia in dias_de_trabalho:
                             turno_info = dias_de_trabalho[dia]
                             esta_afastado = turno_info.get("em_afastamento", False)
                             valor_celula = "X(A)" if esta_afastado else "X"
 
-                # 3. Adiciona o valor do dia na lista
                 valores_linha.append(valor_celula)
 
-            # 4. Insere a linha na tabela UMA ÚNICA VEZ, 
-            #    agora que 'valores_linha' está completa.
             self.tree.insert(
                 "",
                 "end",
-                iid=str(matricula), # Garante que é string
-                image=self.img_unchecked, # Adiciona o checkbox
-                values=valores_linha, # Lista completa (Nome + Dias)
+                iid=str(matricula),
+                image=self.img_unchecked,
+                values=valores_linha,
                 tags=tuple(tags_da_linha),
             )
             row_count += 1
