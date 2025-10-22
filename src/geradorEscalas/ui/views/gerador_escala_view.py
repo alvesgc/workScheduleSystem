@@ -3,6 +3,7 @@ import os
 import customtkinter as ctk
 import tkinter.ttk as ttk
 from tkinter import filedialog, messagebox
+from PIL import Image, ImageTk
 from datetime import date, datetime
 import tkfontawesome as fa
 from ..widgets import ctk_checklist_dropdown as checklist
@@ -22,7 +23,7 @@ class GeradorEscalaView(ctk.CTkFrame):
         super().__init__(master, fg_color="#F5F6FA")
         self.app_controller = app_controller
         self.ultima_escala_gerada = None
-
+        self.selected_matriculas = set()
         # === PALETA DE CORES HIERÁRQUICA ===
         PRIMARY = "#0078D7"
         PRIMARY_HOVER = "#005EA6"
@@ -45,6 +46,20 @@ class GeradorEscalaView(ctk.CTkFrame):
         SUCCESS = "#10B981"
         SUCCESS_HOVER = "#059669"
 
+        try:
+            icon_path = "src/geradorEscalas/assets/icons"
+            pil_checked = Image.open(
+                os.path.join(icon_path, "checkbox_checked.png") # [cite: 4]
+            ).resize((16, 16), Image.Resampling.LANCZOS)
+            pil_unchecked = Image.open(
+                os.path.join(icon_path, "checkbox_unchecked.png")
+            ).resize((16, 16), Image.Resampling.LANCZOS)
+            self.img_checked = ImageTk.PhotoImage(pil_checked)
+            self.img_unchecked = ImageTk.PhotoImage(pil_unchecked)
+        except Exception as e:
+            print(f"ERRO: Não foi possível carregar as imagens de checkbox: {e}") # [cite: 5]
+            self.img_checked = self.img_unchecked = None
+            
         # --- Carrega os dados para os filtros ---
         self.escala_filter_vars = {
             escala: ctk.StringVar(value="on")
@@ -337,10 +352,10 @@ class GeradorEscalaView(ctk.CTkFrame):
 
         # Cria a tabela com tema claro (padrão)
         self.tree = CTkAdvancedTable(
-            self.preview_frame, columns=colunas, show_checkbox_column=False
+            self.preview_frame, columns=colunas, show_checkbox_column=True
         )
         self.tree.grid(row=0, column=0, sticky="nsew")
-
+        self.tree.bind("<Button-1>", self.on_row_click)
         self.tree.configure(selectmode="extended")
         # Força a atualização do widget antes de configurar as colunas
         self.tree.update_idletasks()
@@ -464,6 +479,7 @@ class GeradorEscalaView(ctk.CTkFrame):
 
     def _executar_geracao(self):
         """Coleta os filtros, busca os dados, chama o motor de geração e preenche a tabela."""
+        self.selected_matriculas.clear()
         self._setup_treeview()
         loading_label = ctk.CTkLabel(
             self.tree,
@@ -473,7 +489,7 @@ class GeradorEscalaView(ctk.CTkFrame):
         )
         loading_label.place(relx=0.5, rely=0.5, anchor="center")
         self.generate_button.configure(state="disabled")
-        self.modificar_button.configure(state="disabled")
+        self.update_context_buttons()
         self.excel_button.configure(state="disabled")
         self.pdf_button.configure(state="disabled")
         self.update_idletasks()
@@ -515,7 +531,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             self.colaboradores_carregados = self.engine.colaboradores
             self._preencher_tabela(dados_escala)
 
-            self.modificar_button.configure(state="normal")
+            # self.modificar_button.configure(state="normal")
             self.excel_button.configure(state="normal")
             self.pdf_button.configure(state="normal")
 
@@ -543,8 +559,11 @@ class GeradorEscalaView(ctk.CTkFrame):
 
     def _preencher_tabela(self, dados_escala):
         """Preenche a tabela com 'X' para trabalho e 'F' para folga."""
-        for item in self.tree.get_children():
-            self.tree.delete(item)
+        
+        # REMOVIDO: Este loop não é necessário se _setup_treeview
+        # já cria uma tabela nova.
+        # for item in self.tree.get_children():
+        #     self.tree.delete(item)
 
         mes_numero = self.meses_map[self.mes_var.get()]
         ano = int(self.ano_var.get())
@@ -569,16 +588,17 @@ class GeradorEscalaView(ctk.CTkFrame):
                 tags_da_linha.append("critical_escala")
 
             escala_data_base = info.get("escala_data_base")
+            
+            # 1. Começa a lista de valores SÓ com o nome
             valores_linha = [info.get("nome", matricula)]
-
+            
+            # 2. Faz o loop dos dias ANTES de inserir
             for dia in range(1, 32):
                 valor_celula = ""  # O padrão agora é VAZIO
 
                 if dia <= num_dias_no_mes:
                     data_do_dia = date(ano, mes_numero, dia)
 
-                    # Só preenche com X ou F se o dia for posterior ou igual à data base
-                    # ou se não houver data base (ex: Diarista)
                     if not escala_data_base or data_do_dia >= escala_data_base:
                         valor_celula = "F"  # O padrão dentro do ciclo é Folga
                         if dia in dias_de_trabalho:
@@ -586,14 +606,17 @@ class GeradorEscalaView(ctk.CTkFrame):
                             esta_afastado = turno_info.get("em_afastamento", False)
                             valor_celula = "X(A)" if esta_afastado else "X"
 
+                # 3. Adiciona o valor do dia na lista
                 valores_linha.append(valor_celula)
 
-            # Insere a linha completa de uma vez
+            # 4. Insere a linha na tabela UMA ÚNICA VEZ, 
+            #    agora que 'valores_linha' está completa.
             self.tree.insert(
                 "",
                 "end",
-                iid=matricula,
-                values=valores_linha,
+                iid=str(matricula), # Garante que é string
+                image=self.img_unchecked, # Adiciona o checkbox
+                values=valores_linha, # Lista completa (Nome + Dias)
                 tags=tuple(tags_da_linha),
             )
             row_count += 1
@@ -718,11 +741,11 @@ class GeradorEscalaView(ctk.CTkFrame):
             )
             
     def _modificar_escala_selecionados(self):
-        selecionados_matriculas = self.tree.selection() # Pega os IIDs (matrículas)
+        selecionados_matriculas = self.get_selected_matriculas() # Pega os IIDs (matrículas)
         if not selecionados_matriculas:
             messagebox.showwarning(
                 "Ninguém Selecionado", 
-                "Por favor, selecione um ou mais colaboradores na tabela para modificar a escala.", 
+                "Por favor, selecione um ou mais colaboradores na tabela para modificar a escala.", # [cite: 134]
                 parent=self
             )
             return
@@ -763,7 +786,40 @@ class GeradorEscalaView(ctk.CTkFrame):
             master=self,
             colaboradores=colaboradores_para_modificar,
             save_callback=self._handle_modificacao_save, # <-- AQUI ESTÁ A MUDANÇA
-            title="Modificar Escala de Colaboradores"
+            title="Modificar Escala de Colaboradores",
+            mode='initial'
         )
         
+    def get_selected_matriculas(self):
+        """Retorna lista de matrículas selecionadas."""
+        return list(self.selected_matriculas) # [cite: 39]
+
+    def update_context_buttons(self):
+        """Habilita/desabilita botões baseado na seleção."""
+        # Adaptado de [cite: 38]
+        state = "normal" if self.selected_matriculas else "disabled"
+        self.modificar_button.configure(state=state)
+
+    def on_row_click(self, event):
+        """Gerencia cliques nos checkboxes."""
+        # Baseado em [cite: 36-38]
+        item_id = self.tree.identify_row(event.y)
+        if not item_id:
+            return
+
+        # Alterna a seleção
+        if item_id in self.selected_matriculas:
+            self.selected_matriculas.remove(item_id)
+            self.tree.item(item_id, image=self.img_unchecked) # [cite: 37]
+        else:
+            self.selected_matriculas.add(item_id)
+            self.tree.item(item_id, image=self.img_checked) # [cite: 37]
+
+        # Atualiza a seleção visual do CTkAdvancedTable
+        if self.selected_matriculas:
+            self.tree.selection_set(list(self.selected_matriculas)) # [cite: 37]
+        else:
+            self.tree.selection_set([]) # [cite: 37]
+
+        self.update_context_buttons() # [cite: 38]
    
