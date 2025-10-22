@@ -722,7 +722,7 @@ class GeradorEscalaView(ctk.CTkFrame):
         try:
             for matricula, nova_data_str in updates_dict.items():
                 # Aqui usamos a função de banco de dados que já tínhamos
-                db.atualizar_data_base_e_sequencia(matricula, nova_data_str)
+                db.atualizar_data_base_e_sequencia_padrao(matricula, nova_data_str)
             
             messagebox.showinfo(
                 "Sucesso", 

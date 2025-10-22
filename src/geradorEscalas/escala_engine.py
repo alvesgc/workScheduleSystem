@@ -9,6 +9,51 @@ class GeradorEscalaEngine:
         self.mes = int(mes)
         self.escala_gerada = {}
         self.colaboradores = []
+
+    def _calcular_ciclo_par_impar(
+        self, data_base, ano_referencia, mes_referencia, horas_trabalho, horas_folga
+    ):
+        """
+        Calcula se o colaborador está em ciclo PAR ou ÍMPAR no mês de referência.
+
+        Lógica:
+        - Conta quantos CICLOS COMPLETOS se passaram desde a data base até o início do mês
+        - Se número de ciclos é PAR (0, 2, 4...) → ciclo ÍMPAR (começa na data base original)
+        - Se número de ciclos é ÍMPAR (1, 3, 5...) → ciclo PAR (começa 24h depois)
+
+        Returns:
+            tuple: (é_ciclo_par, data_inicio_ajustada)
+        """
+        try:
+            data_base_obj = date.fromisoformat(str(data_base))
+        except (ValueError, TypeError):
+            return False, data_base
+
+        # Data de referência: primeiro dia do mês que queremos calcular
+        primeiro_dia_mes = date(ano_referencia, mes_referencia, 1)
+
+        # Calcula a diferença em dias
+        dias_desde_base = (primeiro_dia_mes - data_base_obj).days
+
+        # Duração de um ciclo completo em dias
+        horas_ciclo = horas_trabalho + horas_folga
+        dias_ciclo = horas_ciclo / 24
+
+        # Quantos ciclos completos se passaram
+        ciclos_completos = int(dias_desde_base / dias_ciclo)
+
+        # Se o número de ciclos completos é ÍMPAR, estamos no ciclo PAR
+        # Se o número de ciclos completos é PAR, estamos no ciclo ÍMPAR
+        e_ciclo_par = ciclos_completos % 2 == 1
+
+        # Ajusta a data base se for ciclo PAR (adiciona 24h)
+        if e_ciclo_par:
+            data_inicio_ajustada = data_base_obj + timedelta(days=1)
+        else:
+            data_inicio_ajustada = data_base_obj
+
+        return e_ciclo_par, data_inicio_ajustada
+
     def _gerar_ciclo(self, data_base, horas_trabalho, horas_folga):
         """
         Calcula e retorna uma lista de objetos datetime completos para cada início de turno
@@ -41,18 +86,18 @@ class GeradorEscalaEngine:
                 proximo_mes = 1
                 proximo_ano += 1
             limite_superior = datetime(proximo_ano, proximo_mes, 1)
-        except ValueError:  # Lida com meses que não têm dia 31, etc.
+        except ValueError:
             limite_superior = datetime(
                 self.ano, self.mes, monthrange(self.ano, self.mes)[1]
             ) + timedelta(days=1)
 
-        # CORREÇÃO: Loop principal sem condição adicional problemática
+        # Loop principal
         while data_atual < limite_superior:
             # Verifica se o turno está no mês correto
             if data_atual.year == self.ano and data_atual.month == self.mes:
                 inicios_de_turno.append(data_atual)
 
-            # IMPORTANTE: Incrementa SEMPRE para evitar loop infinito
+            # Incrementa sempre
             data_atual += intervalo
 
         return inicios_de_turno
@@ -60,76 +105,113 @@ class GeradorEscalaEngine:
     # --- Métodos Específicos para Cada Tipo de Escala ---
 
     def _calcular_escala_12x36(self, colaborador):
+        """
+        Calcula escala 12x36 com lógica automática de par/ímpar.
+        """
         data_base = colaborador.get("escala_data_base")
+        matricula = colaborador.get("matricula")
         if not data_base:
             return []
+
+        # Calcula se está em ciclo par ou ímpar
+        e_ciclo_par, data_base_ajustada = self._calcular_ciclo_par_impar(
+            data_base, self.ano, self.mes, 12, 36
+        )
+
+        # Gera os turnos usando a data base ajustada
         turnos = []
-        for dt in self._gerar_ciclo(data_base, 12, 36):
+        for dt in self._gerar_ciclo(data_base_ajustada, 12, 36):
             turnos.append({"dia": dt.day, "turno": "X"})
+
+        # Atualiza sequência no banco para referência
+        sequencia = "PAR" if e_ciclo_par else "IMPAR"
+        if matricula:
+            db.update_sequencia_colaborador(matricula, sequencia)
+
         return turnos
 
     def _calcular_escala_24x72(self, colaborador):
+        """
+        Calcula escala 24x72 com lógica automática de par/ímpar.
+        """
         data_base = colaborador.get("escala_data_base")
+        matricula = colaborador.get("matricula")
         if not data_base:
             return []
+
+        # Calcula se está em ciclo par ou ímpar
+        e_ciclo_par, data_base_ajustada = self._calcular_ciclo_par_impar(
+            data_base, self.ano, self.mes, 24, 72
+        )
+
+        # Gera os turnos usando a data base ajustada
         turnos = []
-        for dt in self._gerar_ciclo(data_base, 24, 72):
+        for dt in self._gerar_ciclo(data_base_ajustada, 24, 72):
             turnos.append({"dia": dt.day, "turno": "X"})
+
+        # Atualiza sequência no banco para referência
+        sequencia = "PAR" if e_ciclo_par else "IMPAR"
+        if matricula:
+            db.update_sequencia_colaborador(matricula, sequencia)
+
         return turnos
 
     def _calcular_escala_24x120(self, colaborador):
         """
-        Calcula a escala 24x120 com a lógica de alternância de ciclos (par/ímpar),
-        respeitando a atualização da data base.
+        Calcula escala 24x120 com lógica automática de par/ímpar.
+        Nesta escala, o colaborador trabalha em meses alternados.
         """
-        data_base_original = colaborador.get("escala_data_base")
-        # A sequência armazenada reflete o estado do ÚLTIMO ciclo calculado ou o que foi definido na atualização.
-        sequencia_armazenada = colaborador.get("escala_sequencia_atual", "IMPAR")
+        data_base = colaborador.get("escala_data_base")
         matricula = colaborador.get("matricula")
-
-        if not data_base_original or not matricula:
+        if not data_base:
             return []
 
-        # --- LÓGICA DE DECISÃO DA SEQUÊNCIA ---
-        sequencia_deste_mes = ""
-        # Verifica se a data base de referência está no mesmo mês e ano que estamos gerando a escala.
-        if data_base_original.year == self.ano and data_base_original.month == self.mes:
-            # Se a data base foi definida neste mês, a sequência para este mês é exatamente a que foi armazenada.
-            # Isso acontece quando você acaba de chamar a função de atualização.
-            sequencia_deste_mes = sequencia_armazenada
-        else:
-            # Se a data base é de um mês anterior, a lógica de alternância normal se aplica.
-            # A sequência deste mês é o inverso da que está armazenada (que foi a do mês passado).
-            sequencia_deste_mes = "PAR" if sequencia_armazenada == "IMPAR" else "IMPAR"
+        try:
+            data_base_obj = date.fromisoformat(str(data_base))
+        except (ValueError, TypeError):
+            return []
 
-        # --- CÁLCULO DO CICLO ---
-        # Define a data de início do ciclo para este mês.
-        data_base_para_este_mes = data_base_original
-        if sequencia_deste_mes == "PAR":
-            # Se a regra for PAR, o ciclo começa 24h depois da data base.
-            data_base_para_este_mes_dt = datetime.combine(
-                data_base_original, datetime.min.time()
-            ) + timedelta(hours=24)
-            data_base_para_este_mes = data_base_para_este_mes_dt.date()
+        # Calcula quantos meses se passaram desde a data base
+        primeiro_dia_mes = date(self.ano, self.mes, 1)
+        meses_desde_base = (primeiro_dia_mes.year - data_base_obj.year) * 12 + (
+            primeiro_dia_mes.month - data_base_obj.month
+        )
 
-        # Gera o ciclo usando a data base correta para o mês
-        turnos_formatados = []
-        for dt_inicio_turno in self._gerar_ciclo(data_base_para_este_mes, 24, 120):
-            turnos_formatados.append({"dia": dt_inicio_turno.day, "turno": "X"})
+        # Verifica se trabalha neste mês (alternância mensal)
+        trabalha_neste_mes = meses_desde_base % 2 == 0
 
-        # --- ATUALIZAÇÃO PARA O FUTURO ---
-        # Atualiza o estado no banco de dados com a sequência que foi USADA neste mês.
-        # Assim, a geração do PRÓXIMO mês saberá como alternar.
-        db.update_sequencia_colaborador(matricula, sequencia_deste_mes)
+        if not trabalha_neste_mes:
+            # Está em mês de folga
+            sequencia = "FOLGA_MES"
+            if matricula:
+                db.update_sequencia_colaborador(matricula, sequencia)
+            return []
 
-        return turnos_formatados
+        # Calcula se está em ciclo par ou ímpar DENTRO do mês de trabalho
+        e_ciclo_par, data_base_ajustada = self._calcular_ciclo_par_impar(
+            data_base, self.ano, self.mes, 24, 120
+        )
 
+        # Gera os turnos usando a data base ajustada
+        turnos = []
+        for dt in self._gerar_ciclo(data_base_ajustada, 24, 120):
+            turnos.append({"dia": dt.day, "turno": "X"})
+
+        # Atualiza sequência no banco
+        sequencia = f"TRABALHA_{'PAR' if e_ciclo_par else 'IMPAR'}"
+        if matricula:
+            db.update_sequencia_colaborador(matricula, sequencia)
+
+        return turnos
 
     def _calcular_diarista(self, colaborador):
+        """
+        Calcula escala de diarista (segunda a sexta).
+        """
         turnos_formatados = []
         num_dias = monthrange(self.ano, self.mes)[1]
         for dia in range(1, num_dias + 1):
-            if weekday(self.ano, self.mes, dia) < 5:
+            if weekday(self.ano, self.mes, dia) < 5:  # 0-4 = Seg-Sex
                 turnos_formatados.append({"dia": dia, "turno": "X"})
         return turnos_formatados
 
@@ -178,7 +260,7 @@ class GeradorEscalaEngine:
 
             self.escala_gerada[matricula] = {
                 "nome": colab.get("nome"),
-                "escala": tipo_escala,  # Adiciona o tipo de escala
+                "escala": tipo_escala,
                 "dias": dias_de_trabalho_final,
             }
 

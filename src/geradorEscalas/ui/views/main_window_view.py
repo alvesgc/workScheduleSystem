@@ -98,7 +98,7 @@ class MainView(ctk.CTkFrame):
         }
 
         # === LOGO  ===
-        logo_path = resource_path("geradorEscalas/assets/logo.png")
+        logo_path = resource_path(os.path.join("src", "geradorEscalas", "assets", "logo.png"))
 
         try:
             pil_logo = PIL_Image.open(logo_path)
