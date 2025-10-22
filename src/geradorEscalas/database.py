@@ -215,9 +215,9 @@ def get_all_collaborators_dataframe(search_term=None):
     params = {}
 
     if search_term:
-        query_str += " AND (nome LIKE :term OR matricula LIKE :term OR cargo LIKE :term OR setor LIKE :term)"
+        query_str += " AND (nome LIKE :term OR matricula LIKE :term  OR setor LIKE :term OR cargo LIKE :term)"
         params["term"] = f"%{search_term}%"
-        
+
     query_str += " ORDER BY nome"
 
     try:
@@ -609,3 +609,35 @@ def get_distinct_setores():
         )
         result = connection.execute(query).fetchall()
         return [row[0] for row in result]
+    
+def atualizar_data_base_e_sequencia(matricula, nova_data_base_str):
+    """
+    Atualiza a data base de um colaborador e recalcula a sequência inicial (PAR/IMPAR).
+    """
+    try:
+        # Converte a string de data para um objeto date
+        nova_data_obj = date.fromisoformat(nova_data_base_str)
+
+        # Regra: Dia ímpar = IMPAR, Dia par = PAR
+        nova_sequencia = "IMPAR" if nova_data_obj.day % 2 != 0 else "PAR"
+
+        # Conecte ao seu banco de dados e execute o UPDATE
+        # Exemplo (adapte para a sua implementação de banco de dados):
+        conn = engine.connect() # Sua função de conexão
+        cursor = conn.cursor()
+        
+        query = """
+            UPDATE sua_tabela_de_colaboradores
+            SET escala_data_base = ?, escala_sequencia_atual = ?
+            WHERE matricula = ?
+        """
+        cursor.execute(query, (nova_data_obj, nova_sequencia, matricula))
+        conn.commit()
+        conn.close()
+        
+        print(f"Escala do colaborador {matricula} atualizada para {nova_data_obj} com sequência {nova_sequencia}.")
+        return True
+        
+    except Exception as e:
+        print(f"Erro ao atualizar a escala: {e}")
+        return False

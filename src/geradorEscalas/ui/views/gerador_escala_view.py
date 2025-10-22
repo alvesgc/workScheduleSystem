@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox
 from datetime import date, datetime
 import tkfontawesome as fa
 from ..widgets import ctk_checklist_dropdown as checklist
+from .setup_escala_view import SetupEscalaView
 from ... import exporters
 from ... import fonts
 from ...escala_engine import GeradorEscalaEngine
@@ -72,7 +73,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             "generate": fa.icon_to_image(
                 "cogs", fill="#FFFFFF", scale_to_height=icon_size
             ),
-            "save": fa.icon_to_image("save", fill="#FFFFFF", scale_to_height=icon_size),
+            "edit": fa.icon_to_image("edit", fill="#FFFFFF", scale_to_height=icon_size),
             "excel": fa.icon_to_image(
                 "file-excel", fill="#FFFFFF", scale_to_height=icon_size
             ),
@@ -253,20 +254,20 @@ class GeradorEscalaView(ctk.CTkFrame):
         actions_frame = ctk.CTkFrame(self, fg_color="transparent")
         actions_frame.grid(row=2, column=0, padx=24, pady=(0, 12), sticky="e")
 
-        self.salvar_button = ctk.CTkButton(
+        self.modificar_button = ctk.CTkButton(
             actions_frame,
-            text="Salvar",
+            text="Modificar Escala",
             font=fonts.BUTTON_FONT,
-            image=self.icons.get("save"),
+            image=self.icons.get("edit"),
             compound="left",
             state="disabled",
-            command=self._salvar_no_historico,
-            fg_color=SUCCESS,
-            hover_color=SUCCESS_HOVER,
+            command=self._modificar_escala_selecionados,
+            fg_color=PRIMARY,
+            hover_color=PRIMARY_HOVER,
             height=36,
             corner_radius=8,
         )
-        self.salvar_button.pack(side="left", padx=(0, 8))
+        self.modificar_button.pack(side="left", padx=(0, 8))
 
         self.excel_button = ctk.CTkButton(
             actions_frame,
@@ -340,6 +341,7 @@ class GeradorEscalaView(ctk.CTkFrame):
         )
         self.tree.grid(row=0, column=0, sticky="nsew")
 
+        self.tree.configure(selectmode="extended")
         # Força a atualização do widget antes de configurar as colunas
         self.tree.update_idletasks()
 
@@ -370,13 +372,34 @@ class GeradorEscalaView(ctk.CTkFrame):
 
     def _gerar_previa(self):
         unconfigured = db.get_unconfigured_collaborators()
+        
         if unconfigured:
+            # Formata a lista para a tela de setup (garante o campo data_base_atual)
+            colabs_para_setup = [
+                {
+                    "matricula": c.get("matricula"), 
+                    "nome": c.get("nome"), 
+                    "data_base_atual": "" # Vazio, para o SetupView usar today_str
+                } for c in unconfigured
+            ]
+            
+            messagebox.showinfo(
+                "Configuração Pendente",
+                f"Existem {len(colabs_para_setup)} colaborador(es) sem uma data de início de escala. "
+                "Por favor, configure-os agora.",
+                parent=self
+            )
+
             popup = SetupEscalaView(
-                self, colaboradores=unconfigured, save_callback=self._on_setup_save
+                self, 
+                colaboradores=colabs_para_setup, 
+                save_callback=self._on_setup_save,
+                title="Configuração Inicial de Escala", # <-- ADICIONADO
+                mode='initial'                        # <-- ADICIONADO
             )
             self.wait_window(popup)
         else:
-            self._executar_geracao()
+            self._executar_geracao() # Chama a geração normal
 
     def _on_setup_save(self, updates):
         success, message = db.update_collaborator_base_dates(updates)
@@ -450,7 +473,7 @@ class GeradorEscalaView(ctk.CTkFrame):
         )
         loading_label.place(relx=0.5, rely=0.5, anchor="center")
         self.generate_button.configure(state="disabled")
-        self.salvar_button.configure(state="disabled")
+        self.modificar_button.configure(state="disabled")
         self.excel_button.configure(state="disabled")
         self.pdf_button.configure(state="disabled")
         self.update_idletasks()
@@ -485,14 +508,14 @@ class GeradorEscalaView(ctk.CTkFrame):
 
             self._marcar_dias_especiais(ano, mes_numero)
 
-            engine = GeradorEscalaEngine(ano, mes_numero)
-            dados_escala = engine.executar(colaboradores_para_gerar)
+            self.engine = GeradorEscalaEngine(ano, mes_numero)
+            dados_escala = self.engine.executar(colaboradores_para_gerar)
 
             self.ultima_escala_gerada = dados_escala
-
+            self.colaboradores_carregados = self.engine.colaboradores
             self._preencher_tabela(dados_escala)
 
-            self.salvar_button.configure(state="normal")
+            self.modificar_button.configure(state="normal")
             self.excel_button.configure(state="normal")
             self.pdf_button.configure(state="normal")
 
@@ -544,53 +567,59 @@ class GeradorEscalaView(ctk.CTkFrame):
 
             if tem_escala_critica:
                 tags_da_linha.append("critical_escala")
-                
+
             escala_data_base = info.get("escala_data_base")
             valores_linha = [info.get("nome", matricula)]
-            
+
             for dia in range(1, 32):
-                valor_celula = '' # O padrão agora é VAZIO
-                
+                valor_celula = ""  # O padrão agora é VAZIO
+
                 if dia <= num_dias_no_mes:
                     data_do_dia = date(ano, mes_numero, dia)
-                    
+
                     # Só preenche com X ou F se o dia for posterior ou igual à data base
                     # ou se não houver data base (ex: Diarista)
                     if not escala_data_base or data_do_dia >= escala_data_base:
-                        valor_celula = "F" # O padrão dentro do ciclo é Folga
+                        valor_celula = "F"  # O padrão dentro do ciclo é Folga
                         if dia in dias_de_trabalho:
                             turno_info = dias_de_trabalho[dia]
                             esta_afastado = turno_info.get("em_afastamento", False)
                             valor_celula = "X(A)" if esta_afastado else "X"
-                
+
                 valores_linha.append(valor_celula)
-            
+
             # Insere a linha completa de uma vez
-            self.tree.insert("", "end", values=valores_linha, tags=tuple(tags_da_linha))
+            self.tree.insert(
+                "",
+                "end",
+                iid=matricula,
+                values=valores_linha,
+                tags=tuple(tags_da_linha),
+            )
             row_count += 1
 
-    def _salvar_no_historico(self):
-        """Salva a escala gerada no histórico."""
-        if self.ultima_escala_gerada:
-            mes_nome = self.mes_var.get()
-            ano = self.ano_var.get()
+    # def _salvar_no_historico(self):
+    #     """Salva a escala gerada no histórico."""
+    #     if self.ultima_escala_gerada:
+    #         mes_nome = self.mes_var.get()
+    #         ano = self.ano_var.get()
 
-            confirmar = messagebox.askyesno(
-                "Confirmar",
-                f"Deseja salvar a escala de {mes_nome}/{ano} no histórico?\n"
-                "Isso irá sobrescrever qualquer escala salva anteriormente para este mesmo período.",
-                parent=self,
-            )
+    #         confirmar = messagebox.askyesno(
+    #             "Confirmar",
+    #             f"Deseja salvar a escala de {mes_nome}/{ano} no histórico?\n"
+    #             "Isso irá sobrescrever qualquer escala salva anteriormente para este mesmo período.",
+    #             parent=self,
+    #         )
 
-            if confirmar:
-                mes_numero = self.meses_map[mes_nome]
-                self.app_controller.on_save_escala_historico(
-                    self.ultima_escala_gerada, mes_numero, int(ano)
-                )
-        else:
-            messagebox.showwarning(
-                "Aviso", "Nenhuma escala foi gerada para salvar.", parent=self
-            )
+    #         if confirmar:
+    #             mes_numero = self.meses_map[mes_nome]
+    #             self.app_controller.on_save_escala_historico(
+    #                 self.ultima_escala_gerada, mes_numero, int(ano)
+    #             )
+    #     else:
+    #         messagebox.showwarning(
+    #             "Aviso", "Nenhuma escala foi gerada para salvar.", parent=self
+    #         )
 
     def _exportar_para_excel(self):
         if not self.ultima_escala_gerada:
@@ -661,3 +690,80 @@ class GeradorEscalaView(ctk.CTkFrame):
                     f"Não foi possível salvar o arquivo PDF:\n{e}",
                     parent=self,
                 )
+
+    def _handle_modificacao_save(self, updates_dict):
+        """
+        Esta função é chamada pelo SetupEscalaView quando o usuário clica em salvar.
+        updates_dict: {'matricula': 'AAAA-MM-DD', ...}
+        """
+        try:
+            for matricula, nova_data_str in updates_dict.items():
+                # Aqui usamos a função de banco de dados que já tínhamos
+                db.atualizar_data_base_e_sequencia(matricula, nova_data_str)
+            
+            messagebox.showinfo(
+                "Sucesso", 
+                f"{len(updates_dict)} colaborador(es) atualizado(s) com sucesso!", 
+                parent=self
+            )
+            
+            # Regera a prévia para mostrar os dados atualizados
+            self._executar_geracao()
+
+        except Exception as e:
+            messagebox.showerror(
+                "Erro na Atualização", 
+                f"Ocorreu um erro ao atualizar os dados: {e}", 
+                parent=self
+            )
+            
+    def _modificar_escala_selecionados(self):
+        selecionados_matriculas = self.tree.selection() # Pega os IIDs (matrículas)
+        if not selecionados_matriculas:
+            messagebox.showwarning(
+                "Ninguém Selecionado", 
+                "Por favor, selecione um ou mais colaboradores na tabela para modificar a escala.", 
+                parent=self
+            )
+            return
+
+        # 1. Preparar a lista de colaboradores para a tela de setup
+        colaboradores_para_modificar = []
+        
+        # Verifica se os dados dos colaboradores foram carregados
+        if not hasattr(self, 'colaboradores_carregados') or not self.colaboradores_carregados:
+            messagebox.showerror(
+                "Erro", 
+                "Dados de colaboradores não encontrados. Gere uma prévia primeiro.", 
+                parent=self
+            )
+            return
+
+        for colab in self.colaboradores_carregados:
+            matricula = colab.get("matricula")
+            # Se o colaborador da lista completa estiver entre os selecionados na tabela...
+            if matricula in selecionados_matriculas:
+                # Formata a data base atual para "DD/MM/AAAA"
+                data_base_str = ""
+                data_base_obj = colab.get("escala_data_base")
+                if data_base_obj:
+                    try:
+                        data_base_str = data_base_obj.strftime("%d/%m/%Y")
+                    except Exception:
+                        pass # Deixa em branco se a data for inválida
+
+                colaboradores_para_modificar.append({
+                    "matricula": matricula,
+                    "nome": colab.get("nome"),
+                    "data_base_atual": data_base_str # Envia no formato DD/MM/AAAA
+                })
+
+        # 2. Chamar a tela SetupEscalaView
+        SetupEscalaView(
+            master=self,
+            colaboradores=colaboradores_para_modificar,
+            save_callback=self._handle_modificacao_save, # <-- AQUI ESTÁ A MUDANÇA
+            title="Modificar Escala de Colaboradores"
+        )
+        
+   
