@@ -585,13 +585,6 @@ class GeradorEscalaView(ctk.CTkFrame):
 
             escala_data_base = info.get("escala_data_base")
             
-            # DEBUG - Imprima para ver os valores
-            print(f"\n=== Matrícula: {matricula} ===")
-            print(f"Nome: {info.get('nome', matricula)}")
-            print(f"escala_data_base: {escala_data_base} (tipo: {type(escala_data_base)})")
-            print(f"Mês/Ano visualizado: {mes_numero}/{ano}")
-            print(f"Dias de trabalho: {list(dias_de_trabalho.keys())}")
-            
             valores_linha = [info.get("nome", matricula)]
             
             for dia in range(1, 32):
@@ -599,11 +592,6 @@ class GeradorEscalaView(ctk.CTkFrame):
 
                 if dia <= num_dias_no_mes:
                     data_do_dia = date(ano, mes_numero, dia)
-
-                    # DEBUG para os primeiros 3 dias
-                    if dia <= 3:
-                        print(f"Dia {dia}: data_do_dia={data_do_dia}, escala_data_base={escala_data_base}, comparação={data_do_dia >= escala_data_base if escala_data_base else 'N/A'}")
-
                     # CORREÇÃO: Só aplica F/X se houver data base E o dia for >= data base
                     if escala_data_base and data_do_dia >= escala_data_base:
                         # Dentro do período válido: padrão é Folga
