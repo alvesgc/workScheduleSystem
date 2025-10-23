@@ -563,55 +563,33 @@ def batch_update_collaborators(matriculas, field_to_update, new_value):
             return False, f"Erro de banco de dados: {e}"
 
 
-def get_all_active_collaborators(filtros=None):
-    """
-    Busca colaboradores ativos, aplicando filtros opcionais.
-    Filtros é um dicionário: {'escala_types': ['12x36'], 'matriculas': ['123']}
-    """
+def get_all_collaborators_dataframe(search_term=None):
+    """Busca os colaboradores, opcionalmente filtrando, e retorna como DataFrame."""
     if not engine:
-        return []
+        return pd.DataFrame()
 
-    params = {}
+    # A construção da query está correta
     query_str = """
-        SELECT matricula, nome, escala, cargo, setor, tipo_turno, escala_data_base, escala_sequencia_atual,
-               afastamento_inicio, afastamento_fim, conselho, afastamento_motivo
-        FROM colaboradores
-        WHERE ativo = 1
+        SELECT nome, matricula, cargo, setor, escala
+        FROM colaboradores WHERE ativo = TRUE
     """
-    if filtros:
-        if filtros.get("escala_types"):
-            in_placeholders = ", ".join(
-                [f":escala_{i}" for i in range(len(filtros["escala_types"]))]
-            )
-            query_str += f" AND escala IN ({in_placeholders})"
-            params.update(
-                {f"escala_{i}": val for i, val in enumerate(filtros["escala_types"])}
-            )
+    params = {}
 
-        if filtros.get("matriculas"):
-            in_placeholders = ", ".join(
-                [f":mat_{i}" for i in range(len(filtros["matriculas"]))]
-            )
-            query_str += f" AND matricula IN ({in_placeholders})"
-            params.update(
-                {f"mat_{i}": val for i, val in enumerate(filtros["matriculas"])}
-            )
+    if search_term:
+        query_str += " AND (nome LIKE :term OR matricula LIKE :term  OR setor LIKE :term OR cargo LIKE :term)"
+        params["term"] = f"%{search_term}%"
 
-        if filtros.get("setores"):
-            in_placeholders = ", ".join(
-                [f":setor_{i}" for i in range(len(filtros["setores"]))]
-            )
-            query_str += f" AND setor IN ({in_placeholders})"
-            params.update(
-                {f"setor_{i}": val for i, val in enumerate(filtros["setores"])}
-            )
     query_str += " ORDER BY nome"
 
-    with engine.connect() as connection:
-        query = text(query_str)
-        result = connection.execute(query, params).fetchall()
-        return [row._asdict() for row in result]
-
+    try:
+        # --- A CORREÇÃO ESTÁ AQUI ---
+        # Envolvemos a string da query com a função text() do SQLAlchemy
+        # para garantir que os parâmetros sejam processados corretamente.
+        df = pd.read_sql(text(query_str), engine, params=params)
+        return df
+    except Exception as e:
+        print(f"Erro ao executar a pesquisa no banco de dados: {e}")
+        return pd.DataFrame()
 
 def get_unconfigured_collaborators():
     """Busca colaboradores com escalas cíclicas que não têm uma data base definida."""
