@@ -264,6 +264,8 @@ class GeradorEscalaEngine:
                 "dias": dias_de_trabalho_final,
                 "escala_data_base": colab.get("escala_data_base"),
                 "setor": colab.get("setor", ""),
+                "cargo": colab.get("cargo", ""),
+                "conselho": colab.get("conselho", ""),
                 "tipo_turno": colab.get("tipo_turno", "")
             }
 

@@ -404,8 +404,8 @@ def get_all_active_collaborators(filtros=None):
 
     params = {}
     query_str = """
-        SELECT matricula, nome, escala, setor, tipo_turno, escala_data_base, escala_sequencia_atual,
-               afastamento_inicio, afastamento_fim
+        SELECT matricula, nome, escala, cargo, setor, tipo_turno, escala_data_base, escala_sequencia_atual,
+               afastamento_inicio, afastamento_fim, conselho
         FROM colaboradores
         WHERE ativo = 1
     """
