@@ -1,116 +1,240 @@
 import mysql.connector
 import bcrypt
 import pandas as pd
-from datetime import date, datetime, timedelta
+from datetime import date
 from sqlalchemy import create_engine, text
-
-# --- CONFIGURAÇÕES DE BANCO DE DADOS (CORRIGIDO) ---
-DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "1234",
-    "port": "3306",
-    "database": "gerador_escala_db",
-}
+import configparser  # <-- Adicionado
+from pathlib import Path  # <-- Adicionado
+import sys  # <-- Adicionado
 
 
-def _get_engine():
-    """Cria e retorna o motor de conexão do SQLAlchemy."""
+def get_config_path():
+    """Determina o caminho do arquivo de configuração."""
+    app_name = "GeradorEscalas"  # Use o nome do seu aplicativo
+    config_filename = "config.ini"
     try:
-        connection_string = (
-            f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}"
-            f"@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
-        )
-        return create_engine(connection_string)
+        config_dir = Path.home() / f".{app_name}"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        return config_dir / config_filename
     except Exception as e:
-        print(f"ERRO CRÍTICO: Falha ao criar o motor de conexão: {e}")
-        return None
-
-
-def setup_database():
-    """Garante que o banco de dados e todas as tabelas necessárias existam."""
-    try:
-        # 1. Conecta ao MySQL sem especificar o banco de dados
-        db_connection = mysql.connector.connect(
-            host=DB_CONFIG["host"],
-            user=DB_CONFIG["user"],
-            password=DB_CONFIG["password"],
-            port=DB_CONFIG["port"],
-        )
-        cursor = db_connection.cursor()
-
-        # 2. Cria o banco de dados se ele não existir
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_CONFIG['database']}")
         print(
-            f"Banco de dados '{DB_CONFIG['database']}' verificado/criado com sucesso."
+            f"Aviso: Não foi possível acessar/criar o diretório de configuração no home: {e}"
         )
+        try:
+            app_dir = (
+                Path(sys.executable).parent
+                if getattr(sys, "frozen", False)
+                else Path(__file__).parent
+            )
+            return app_dir / config_filename
+        except Exception as e2:
+            print(
+                f"Erro fatal: Não foi possível determinar o caminho do arquivo de configuração: {e2}"
+            )
+            return None
 
-        cursor.close()
-        db_connection.close()
 
-        # 3. Agora conecta ao banco específico para criar as tabelas
-        engine = _get_engine()
-        with engine.connect() as connection:
-            trans = connection.begin()
+def load_db_config():
+    """Lê a configuração do banco de dados do arquivo config.ini."""
+    config_file = get_config_path()
+    if not config_file:
+        raise ConnectionError("Não foi possível localizar o diretório de configuração.")
 
-            # --- Definição das Tabelas ---
-            tabela_usuarios = """
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(100) NOT NULL UNIQUE,
-                password_hash VARCHAR(255) NOT NULL,
-                role VARCHAR(50) NOT NULL,
-                foto_path VARCHAR(255) NULL
-            );"""
+    config = configparser.ConfigParser()
 
-            tabela_colaboradores = """
-            CREATE TABLE IF NOT EXISTS colaboradores (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                nome VARCHAR(255) NOT NULL,
-                matricula VARCHAR(50) NOT NULL UNIQUE,
-                cargo VARCHAR(100),
-                setor VARCHAR(100),
-                escala VARCHAR(50),
-                tipo_turno VARCHAR(50),
-                conselho VARCHAR(50),
-                ativo BOOLEAN DEFAULT TRUE,
-                escala_data_base DATE NULL DEFAULT NULL,
-                escala_sequencia_atual VARCHAR(10) DEFAULT 'IMPAR',
-                afastamento_inicio DATE NULL DEFAULT NULL,
-                afastamento_fim DATE NULL DEFAULT NULL,
-                afastamento_motivo VARCHAR(255)
-            );"""
+    if not config_file.exists():
+        print(
+            f"Arquivo de configuração não encontrado. Criando um modelo em: {config_file}"
+        )
+        config["Database"] = {
+            "host": "localhost",
+            "user": "seu_usuario",
+            "password": "sua_senha",
+            "port": "3306",
+            "database": "seu_banco",
+        }
+        config["Geral"] = {}
+        try:
+            with open(config_file, "w") as cfgfile:
+                config.write(cfgfile)
+            # Lança o erro para informar o usuário que precisa editar
+            raise FileNotFoundError(
+                f"Arquivo de configuração não encontrado. Um modelo foi criado em {config_file}. Por favor, edite-o com os dados corretos e reinicie a aplicação."
+            )
+        except IOError as e:
+            raise ConnectionError(
+                f"Não foi possível criar o arquivo de configuração em {config_file}. Verifique as permissões. Erro: {e}"
+            )
 
-            tabela_escalas_geradas = """
-            CREATE TABLE IF NOT EXISTS escalas_geradas (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                colaborador_matricula VARCHAR(50) NOT NULL,
-                data_turno DATE NOT NULL,
-                hora_inicio TIME NULL,
-                hora_fim TIME NULL,
-                mes_referencia INT NOT NULL,
-                ano_referencia INT NOT NULL,
-                data_geracao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_colaborador_data (colaborador_matricula, ano_referencia, mes_referencia),
-                FOREIGN KEY (colaborador_matricula) REFERENCES colaboradores(matricula) ON DELETE CASCADE
-            );"""
+    try:
+        config.read(config_file)
+        if "Database" not in config:
+            raise ValueError(
+                "A seção [Database] não foi encontrada no arquivo de configuração."
+            )
 
-            # Executa a criação das tabelas
-            connection.execute(text(tabela_usuarios))
-            connection.execute(text(tabela_colaboradores))
-            connection.execute(text(tabela_escalas_geradas))
+        db_config_read = dict(config["Database"])
 
-            trans.commit()
-            print("Tabelas verificadas/criadas com sucesso.")
+        required_keys = ["host", "user", "password", "port", "database"]
+        missing_keys = [
+            key
+            for key in required_keys
+            if key not in db_config_read or not db_config_read[key]
+        ]
+        if missing_keys:
+            raise ValueError(
+                f"As seguintes chaves estão faltando ou vazias na seção [Database] do config.ini: {', '.join(missing_keys)}"
+            )
 
+        print(f"Configuração do banco lida com sucesso de: {config_file}")
+        return db_config_read  # Retorna o dicionário lido
+
+    except configparser.Error as e:
+        raise ConnectionError(
+            f"Erro ao analisar o arquivo de configuração ({config_file}): {e}"
+        ) from e
+    except (KeyError, ValueError) as e:
+        raise ConnectionError(
+            f"Erro no conteúdo do arquivo de configuração ({config_file}): {e}"
+        ) from e
     except Exception as e:
-        print(f"ERRO CRÍTICO no setup do banco de dados: {e}")
-        return None
+        raise ConnectionError(
+            f"Erro inesperado ao ler a configuração ({config_file}): {e}"
+        ) from e
 
 
-# --- Executa o setup e cria o motor principal ---
-setup_database()
-engine = _get_engine()
+# --- INICIALIZAÇÃO E SETUP DO BANCO ---
+DB_CONFIG = None  # Inicializa como None
+engine = None  # Inicializa como None
+
+try:
+    # Tenta carregar a configuração do arquivo INI
+    DB_CONFIG = load_db_config()
+
+    def _get_engine():
+        """Cria e retorna o motor de conexão do SQLAlchemy USANDO DB_CONFIG."""
+        # Esta função agora usa o DB_CONFIG carregado do INI
+        if not DB_CONFIG:
+            raise ConnectionError("Configuração do banco de dados não carregada.")
+        try:
+            connection_string = (
+                f"mysql+mysqlconnector://{DB_CONFIG['user']}:{DB_CONFIG['password']}"
+                f"@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
+            )
+            return create_engine(connection_string)
+        except Exception as e:
+            print(f"ERRO CRÍTICO: Falha ao criar o motor de conexão: {e}")
+            raise ConnectionError(f"Falha ao criar motor de conexão: {e}") from e
+
+    def setup_database():
+        """Garante que o banco de dados e todas as tabelas necessárias existam."""
+        # Esta função agora usa o DB_CONFIG carregado do INI
+        if not DB_CONFIG:
+            raise ConnectionError(
+                "Configuração do banco de dados não carregada para setup."
+            )
+        try:
+            # 1. Conecta ao MySQL sem especificar o banco
+            db_connection = mysql.connector.connect(
+                host=DB_CONFIG["host"],
+                user=DB_CONFIG["user"],
+                password=DB_CONFIG["password"],
+                port=DB_CONFIG["port"],
+            )
+            cursor = db_connection.cursor()
+
+            # 2. Cria o banco se não existir
+            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_CONFIG['database']}")
+            print(
+                f"Banco de dados '{DB_CONFIG['database']}' verificado/criado com sucesso."
+            )
+            cursor.close()
+            db_connection.close()
+
+            # 3. Conecta ao banco específico para criar as tabelas
+            temp_engine = _get_engine()  # Cria um motor temporário para o setup
+            if not temp_engine:
+                raise ConnectionError(
+                    "Não foi possível obter o motor para criar tabelas."
+                )
+
+            with temp_engine.connect() as connection:
+                trans = connection.begin()
+                # --- Definição das Tabelas (SEU CÓDIGO AQUI - NENHUMA MUDANÇA) ---
+                tabela_usuarios = """
+                CREATE TABLE IF NOT EXISTS usuarios (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    username VARCHAR(100) NOT NULL UNIQUE,
+                    password_hash VARCHAR(255) NOT NULL,
+                    role VARCHAR(50) NOT NULL,
+                    foto_path VARCHAR(255) NULL
+                );"""
+                tabela_colaboradores = """
+                CREATE TABLE IF NOT EXISTS colaboradores (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    nome VARCHAR(255) NOT NULL,
+                    matricula VARCHAR(50) NOT NULL UNIQUE,
+                    cargo VARCHAR(100),
+                    setor VARCHAR(100),
+                    escala VARCHAR(50),
+                    tipo_turno VARCHAR(50),
+                    conselho VARCHAR(50),
+                    ativo BOOLEAN DEFAULT TRUE,
+                    escala_data_base DATE NULL DEFAULT NULL,
+                    escala_sequencia_atual VARCHAR(10) DEFAULT 'IMPAR',
+                    afastamento_inicio DATE NULL DEFAULT NULL,
+                    afastamento_fim DATE NULL DEFAULT NULL,
+                    afastamento_motivo VARCHAR(255)
+                );"""
+                tabela_escalas_geradas = """
+                CREATE TABLE IF NOT EXISTS escalas_geradas (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    colaborador_matricula VARCHAR(50) NOT NULL,
+                    data_turno DATE NOT NULL,
+                    hora_inicio TIME NULL,
+                    hora_fim TIME NULL,
+                    mes_referencia INT NOT NULL,
+                    ano_referencia INT NOT NULL,
+                    data_geracao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_colaborador_data (colaborador_matricula, ano_referencia, mes_referencia),
+                    FOREIGN KEY (colaborador_matricula) REFERENCES colaboradores(matricula) ON DELETE CASCADE
+                );"""
+
+                connection.execute(text(tabela_usuarios))
+                connection.execute(text(tabela_colaboradores))
+                connection.execute(text(tabela_escalas_geradas))
+
+                trans.commit()
+                print("Tabelas verificadas/criadas com sucesso.")
+
+        except mysql.connector.Error as err:
+            # Erro específico de conexão/autenticação
+            raise ConnectionError(
+                f"Erro de conexão com o MySQL durante o setup: {err}"
+            ) from err
+        except Exception as e:
+            print(f"ERRO CRÍTICO no setup do banco de dados: {e}")
+            # Propaga o erro para ser pego pelo bloco try/except principal
+            raise ConnectionError(f"Erro durante o setup do banco: {e}") from e
+
+    # --- Executa o setup e cria o motor principal ---
+    setup_database()  # Tenta configurar o banco
+    engine = _get_engine()  # Cria o motor principal que será usado pelas outras funções
+    if not engine:
+        raise ConnectionError("Motor principal do banco de dados não pôde ser criado.")
+    print("Conexão com banco de dados configurada e pronta.")
+
+except (FileNotFoundError, ConnectionError, ValueError) as e:
+    # Captura erros do load_db_config() ou do setup_database()
+    print(f"-------------------------------------------------------------")
+    print(f" ERRO CRÍTICO - CONFIGURAÇÃO DO BANCO DE DADOS INVÁLIDA ")
+    print(f"-------------------------------------------------------------")
+    print(f" Detalhes: {e}")
+    print(f"-------------------------------------------------------------")
+    # Em uma aplicação real, aqui você mostraria um messagebox.showerror
+    # e talvez fechasse a aplicação ou desabilitaria funcionalidades.
+    DB_CONFIG = None  # Garante que DB_CONFIG é None se falhar
+    engine = None  # Garante que engine é None se falhar
 
 
 def get_user_by_username(username):
@@ -405,7 +529,7 @@ def get_all_active_collaborators(filtros=None):
     params = {}
     query_str = """
         SELECT matricula, nome, escala, cargo, setor, tipo_turno, escala_data_base, escala_sequencia_atual,
-               afastamento_inicio, afastamento_fim, conselho
+               afastamento_inicio, afastamento_fim, conselho, afastamento_motivo
         FROM colaboradores
         WHERE ativo = 1
     """
@@ -609,7 +733,8 @@ def get_distinct_setores():
         )
         result = connection.execute(query).fetchall()
         return [row[0] for row in result]
-    
+
+
 def atualizar_data_base_e_sequencia_padrao(matricula, nova_data_base_str):
     """
     Versão seguindo o padrão do seu database.py.
@@ -621,30 +746,34 @@ def atualizar_data_base_e_sequencia_padrao(matricula, nova_data_base_str):
         with engine.connect() as conn:
             trans = conn.begin()
             try:
-                query = text("""
+                query = text(
+                    """
                     UPDATE colaboradores
                     SET escala_data_base = :data_base, 
                         escala_sequencia_atual = :sequencia
                     WHERE matricula = :matricula
-                """)
-                
+                """
+                )
+
                 conn.execute(
                     query,
                     {
                         "data_base": nova_data_obj.isoformat(),
                         "sequencia": nova_sequencia,
-                        "matricula": matricula
-                    }
+                        "matricula": matricula,
+                    },
                 )
                 trans.commit()
-                
-                print(f"Escala do colaborador {matricula} atualizada para {nova_data_obj} com sequência {nova_sequencia}.")
+
+                print(
+                    f"Escala do colaborador {matricula} atualizada para {nova_data_obj} com sequência {nova_sequencia}."
+                )
                 return True
-                
+
             except Exception as e:
                 trans.rollback()
                 raise e
-        
+
     except Exception as e:
         print(f"Erro ao atualizar a escala: {e}")
         return False

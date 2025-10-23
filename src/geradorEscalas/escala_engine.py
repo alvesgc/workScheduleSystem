@@ -251,10 +251,11 @@ class GeradorEscalaEngine:
                 data_do_turno = date(self.ano, self.mes, dia_do_turno)
 
                 # Adiciona flag de afastamento
-                turno["em_afastamento"] = False
                 if inicio_afast and fim_afast:
                     if inicio_afast <= data_do_turno <= fim_afast:
-                        turno["em_afastamento"] = True
+                        motivo = colab.get("afastamento_motivo") 
+                        print(f"DEBUG: Marcando afastamento para Matricula {matricula} no dia {dia_do_turno} com motivo '{motivo}'")
+                        turno["afastamento_motivo"] = motivo
 
                 dias_de_trabalho_final.append(turno)
 
@@ -266,7 +267,8 @@ class GeradorEscalaEngine:
                 "setor": colab.get("setor", ""),
                 "cargo": colab.get("cargo", ""),
                 "conselho": colab.get("conselho", ""),
-                "tipo_turno": colab.get("tipo_turno", "")
+                "tipo_turno": colab.get("tipo_turno", ""),
+                # "afastamento_motivo": colab.get("afastamento_motivo", "")
             }
 
         return self.escala_gerada
