@@ -255,22 +255,12 @@ def _determinar_sequencia(info_colab):
 
 def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
     """Gera múltiplas tabelas (uma por setor), com espaçamento,
-    e garante que não quebrem entre páginas, colorindo afastamentos."""
+    e garante que não quebrem entre páginas, colorindo afastamentos em blocos."""
     from datetime import date
 
     meses_nomes = [
-        "JANEIRO",
-        "FEVEREIRO",
-        "MARÇO",
-        "ABRIL",
-        "MAIO",
-        "JUNHO",
-        "JULHO",
-        "AGOSTO",
-        "SETEMBRO",
-        "OUTUBRO",
-        "NOVEMBRO",
-        "DEZEMBRO",
+        "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
+        "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO",
     ]
     mes_nome = meses_nomes[mes - 1]
     num_dias = monthrange(ano, mes)[1]
@@ -303,6 +293,9 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         "FOLGA": colors.yellow,
         "_DEFAULT_": colors.lightgrey,
     }
+
+    # Tamanho ideal do bloco (pode ajustar entre 4-7 dias)
+    TAMANHO_BLOCO_IDEAL = 5
 
     grupos_de_setor = {}
     for matricula, info in dados_escala.items():
@@ -497,123 +490,59 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
 
                 dias_trabalho = {turno["dia"]: turno for turno in info.get("dias", [])}
                 escala_data_base = info.get("escala_data_base")
-
-                # Obtém dados de afastamento com diferentes nomes de chaves possíveis
-                afastamento_inicio = info.get("afastamento_inicio") or info.get(
-                    "data_inicio_afastamento"
-                )
-                afastamento_fim = info.get("afastamento_fim") or info.get(
-                    "data_fim_afastamento"
-                )
-                afastamento_motivo_geral = info.get("afastamento_motivo") or info.get(
-                    "motivo_afastamento"
-                )
-
-                # DEBUG: Imprime informações de afastamento se existirem
-                if afastamento_inicio or afastamento_fim or afastamento_motivo_geral:
-                    print(
-                        f"\n[DEBUG] Colaborador: {nome_colab} (Matrícula: {matricula})"
-                    )
-                    print(
-                        f"  Afastamento Início: {afastamento_inicio} (tipo: {type(afastamento_inicio)})"
-                    )
-                    print(
-                        f"  Afastamento Fim: {afastamento_fim} (tipo: {type(afastamento_fim)})"
-                    )
-                    print(f"  Motivo: {afastamento_motivo_geral}")
-
-                # Converte strings para objetos date se necessário
-                if isinstance(afastamento_inicio, str):
-                    try:
-                        # Tenta diferentes formatos de data
-                        for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"]:
-                            try:
-                                afastamento_inicio = datetime.strptime(
-                                    afastamento_inicio, fmt
-                                ).date()
-                                break
-                            except:
-                                continue
-                    except:
-                        print(
-                            f"  [ERRO] Não foi possível converter data de início: {afastamento_inicio}"
-                        )
-                        afastamento_inicio = None
-
-                if isinstance(afastamento_fim, str):
-                    try:
-                        for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"]:
-                            try:
-                                afastamento_fim = datetime.strptime(
-                                    afastamento_fim, fmt
-                                ).date()
-                                break
-                            except:
-                                continue
-                    except:
-                        print(
-                            f"  [ERRO] Não foi possível converter data de fim: {afastamento_fim}"
-                        )
-                        afastamento_fim = None
+                afastamento_inicio = info.get("afastamento_inicio")
+                afastamento_fim = info.get("afastamento_fim")
+                afastamento_motivo_geral = info.get("afastamento_motivo")
 
                 cor_afastamento = None
+                motivo_abbrev = ""
                 if afastamento_motivo_geral:
                     motivo_upper = afastamento_motivo_geral.upper().strip()
-                    cor_afastamento = MOTIVO_COLORS.get(
-                        motivo_upper, MOTIVO_COLORS["_DEFAULT_"]
-                    )
-                    print(
-                        f"  Cor definida: {cor_afastamento} para motivo '{motivo_upper}'"
-                    )
+                    cor_afastamento = MOTIVO_COLORS.get(motivo_upper, MOTIVO_COLORS["_DEFAULT_"])
+                    motivo_abbrev = MOTIVO_ABBREV.get(motivo_upper, motivo_upper[:2].upper())
 
-                # --- LÓGICA PARA VALOR DA CÉLULA ---
+                # Determina quais dias estão em afastamento
+                dias_afastamento = set()
+                if (
+                    afastamento_inicio
+                    and afastamento_fim
+                    and isinstance(afastamento_inicio, date)
+                    and isinstance(afastamento_fim, date)
+                ):
+                    primeiro_dia_mes = date(ano, mes, 1)
+                    ultimo_dia_mes = date(ano, mes, num_dias)
+                    
+                    if afastamento_inicio <= ultimo_dia_mes and afastamento_fim >= primeiro_dia_mes:
+                        data_inicio_no_mes = max(afastamento_inicio, primeiro_dia_mes)
+                        data_fim_no_mes = min(afastamento_fim, ultimo_dia_mes)
+                        
+                        for dia_num in range(data_inicio_no_mes.day, data_fim_no_mes.day + 1):
+                            dias_afastamento.add(dia_num)
+
+                # Preenche as células dos dias
                 for dia_num in range(1, num_dias + 1):
                     valor_celula_str = ""
-                    try:
-                        data_do_dia = date(ano, mes, dia_num)
-                    except ValueError:
-                        data_do_dia = None
-                        linha_colab.append("")
-                        continue
-
-                    if data_do_dia:
-                        # 1. Verifica se está no período de afastamento
-                        is_afastamento_day = False
-                        if (
-                            afastamento_inicio
-                            and afastamento_fim
-                            and afastamento_motivo_geral
-                            and isinstance(afastamento_inicio, date)
-                            and isinstance(afastamento_fim, date)
-                        ):
-                            if afastamento_inicio <= data_do_dia <= afastamento_fim:
-                                is_afastamento_day = True
-                                motivo_upper = afastamento_motivo_geral.upper().strip()
-                                valor_celula_str = MOTIVO_ABBREV.get(
-                                    motivo_upper,
-                                    motivo_upper[:2].upper(),
-                                )
-                                if dia_num == 1:  # Debug apenas no primeiro dia
-                                    print(
-                                        f"  Dia {dia_num}: AFASTAMENTO detectado - '{valor_celula_str}'"
-                                    )
-
-                        # 2. Se NÃO for afastamento, verifica trabalho/folga
-                        if not is_afastamento_day:
+                    
+                    if dia_num in dias_afastamento:
+                        # Célula vazia - será preenchida pelo SPAN
+                        valor_celula_str = ""
+                    else:
+                        # Lógica normal de trabalho/folga
+                        try:
+                            data_do_dia = date(ano, mes, dia_num)
                             if not escala_data_base or data_do_dia >= escala_data_base:
-                                valor_celula_str = "F"  # Default é Folga
+                                valor_celula_str = "F"
                                 if dia_num in dias_trabalho:
-                                    valor_celula_str = "X"  # Workday
-
+                                    valor_celula_str = "X"
+                        except ValueError:
+                            valor_celula_str = ""
+                    
                     linha_colab.append(valor_celula_str)
-                # --- FIM DA LÓGICA ---
 
                 dados_para_esta_tabela.append(linha_colab)
 
-                # Estilos da Linha de Dados
-                cor_fundo_zebra = (
-                    colors.HexColor("#F2F2F2") if is_even_row else colors.white
-                )
+                # Estilos da Linha
+                cor_fundo_zebra = colors.HexColor("#F2F2F2") if is_even_row else colors.white
                 estilos_para_esta_tabela.append(
                     ("BACKGROUND", (0, row_index), (-1, row_index), cor_fundo_zebra)
                 )
@@ -624,71 +553,61 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
                     ("BOTTOMPADDING", (0, row_index), (-1, row_index), 3)
                 )
 
-                # --- Colore o bloco de afastamento ---
-                afastamento_cols_colored = set()
-
-                if (
-                    cor_afastamento
-                    and afastamento_inicio
-                    and afastamento_fim
-                    and isinstance(afastamento_inicio, date)
-                    and isinstance(afastamento_fim, date)
-                ):
-                    primeiro_dia_mes = date(ano, mes, 1)
-                    ultimo_dia_mes = date(ano, mes, num_dias)
-
-                    if (
-                        afastamento_inicio <= ultimo_dia_mes
-                        and afastamento_fim >= primeiro_dia_mes
-                    ):
-                        data_inicio_colorir = max(afastamento_inicio, primeiro_dia_mes)
-                        data_fim_colorir = min(afastamento_fim, ultimo_dia_mes)
-
-                        start_day_month = data_inicio_colorir.day
-                        end_day_month = data_fim_colorir.day
-
-                        start_col_idx = start_day_month + 3
-                        end_col_idx = end_day_month + 3
-
-                        print(
-                            f"  Colorindo colunas {start_col_idx} a {end_col_idx} (dias {start_day_month}-{end_day_month})"
-                        )
-
+                # Cria blocos de afastamento
+                if dias_afastamento and cor_afastamento:
+                    dias_ordenados = sorted(dias_afastamento)
+                    
+                    i = 0
+                    while i < len(dias_ordenados):
+                        # Calcula tamanho do bloco
+                        dias_restantes = len(dias_ordenados) - i
+                        tamanho_bloco = min(TAMANHO_BLOCO_IDEAL, dias_restantes)
+                        
+                        # Se sobrar muito pouco, ajusta
+                        if dias_restantes - tamanho_bloco > 0 and dias_restantes - tamanho_bloco < 3:
+                            tamanho_bloco = dias_restantes // 2
+                        
+                        primeiro_dia_bloco = dias_ordenados[i]
+                        ultimo_dia_bloco = dias_ordenados[i + tamanho_bloco - 1]
+                        
+                        start_col = primeiro_dia_bloco + 3
+                        end_col = ultimo_dia_bloco + 3
+                        
+                        # Aplica SPAN e estilos
                         estilos_para_esta_tabela.append(
-                            (
-                                "BACKGROUND",
-                                (start_col_idx, row_index),
-                                (end_col_idx, row_index),
-                                cor_afastamento,
-                            )
+                            ("SPAN", (start_col, row_index), (end_col, row_index))
                         )
-
+                        estilos_para_esta_tabela.append(
+                            ("BACKGROUND", (start_col, row_index), (end_col, row_index), cor_afastamento)
+                        )
+                        estilos_para_esta_tabela.append(
+                            ("ALIGN", (start_col, row_index), (end_col, row_index), "CENTER")
+                        )
+                        estilos_para_esta_tabela.append(
+                            ("FONTNAME", (start_col, row_index), (end_col, row_index), "Helvetica-Bold")
+                        )
+                        estilos_para_esta_tabela.append(
+                            ("FONTSIZE", (start_col, row_index), (end_col, row_index), 8)
+                        )
+                        
+                        # Cor do texto
                         if cor_afastamento in [colors.red, colors.HexColor("#7030A0")]:
                             estilos_para_esta_tabela.append(
-                                (
-                                    "TEXTCOLOR",
-                                    (start_col_idx, row_index),
-                                    (end_col_idx, row_index),
-                                    colors.white,
-                                )
+                                ("TEXTCOLOR", (start_col, row_index), (end_col, row_index), colors.white)
                             )
+                        
+                        # Coloca o texto da abreviação na primeira célula do bloco
+                        linha_colab[start_col] = motivo_abbrev
+                        
+                        i += tamanho_bloco
 
-                        for col_idx in range(start_col_idx, end_col_idx + 1):
-                            afastamento_cols_colored.add(col_idx)
-
-                # Colore Fim de Semana (se não for afastamento)
+                # Colore Fim de Semana (apenas células não afastadas)
                 for dia_num in range(1, num_dias + 1):
-                    if weekday(ano, mes, dia_num) >= 5:
+                    if weekday(ano, mes, dia_num) >= 5 and dia_num not in dias_afastamento:
                         col_index = dia_num + 3
-                        if col_index not in afastamento_cols_colored:
-                            estilos_para_esta_tabela.append(
-                                (
-                                    "BACKGROUND",
-                                    (col_index, row_index),
-                                    (col_index, row_index),
-                                    colors.HexColor("#E7E6E6"),
-                                )
-                            )
+                        estilos_para_esta_tabela.append(
+                            ("BACKGROUND", (col_index, row_index), (col_index, row_index), colors.HexColor("#E7E6E6"))
+                        )
 
                 is_even_row = not is_even_row
                 row_index += 1
