@@ -13,11 +13,11 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from datetime import datetime
+from datetime import date, datetime
 
 
 def exportar_para_excel(dados_escala, ano, mes, caminho_arquivo):
-    """Converte os dados da escala para um formato de grade e salva como um arquivo Excel."""
+    """Gera uma planilha Excel com a escala, incluindo dados do colaborador, dias da semana e motivos de afastamento."""
     meses_nomes = [
         "Janeiro",
         "Fevereiro",
@@ -35,11 +35,47 @@ def exportar_para_excel(dados_escala, ano, mes, caminho_arquivo):
     mes_nome = meses_nomes[mes - 1]
     num_dias = monthrange(ano, mes)[1]
 
-    colunas_dias = [str(i) for i in range(1, num_dias + 1)]
-    dados_para_df = []
+    MOTIVO_ABBREV = {
+        "ATESTADO": "AT",
+        "ATESTADO ACOMP.": "AF",
+        "FÉRIAS": "FE",
+        "FERIAS": "FE",
+        "LICENÇA MATERNIDADE": "LM",
+        "LICENCA MATERNIDADE": "LM",
+        "HORA EXTRA": "HE",
+    }
 
-    for matricula, info in dados_escala.items():
-        linha = {"Colaborador": info.get("nome", matricula)}
+    dias_semana_abrev = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
+
+    # --- Preparação dos dados ---
+    # Define os nomes exatos das colunas como aparecerão no Excel
+    colunas_info = ["Nome", "Cargo", "Matrícula", "Conselho", "Setor"]
+    colunas_dias_num = [str(i) for i in range(1, num_dias + 1)]
+    colunas_finais = colunas_info + colunas_dias_num
+
+    dados_para_df = []  # Agora conterá APENAS os dados dos colaboradores
+
+    # --- Linha EXTRA para os dias da semana (será adicionada depois) ---
+    linha_dias_semana = {col: "" for col in colunas_info}  # Células vazias no início
+    for dia_num in range(1, num_dias + 1):
+        dia_semana_num = weekday(ano, mes, dia_num)
+        linha_dias_semana[str(dia_num)] = dias_semana_abrev[dia_semana_num]
+    # Converte para DataFrame para inserir depois
+    df_dias_semana = pd.DataFrame([linha_dias_semana])
+
+    # --- Linhas dos Colaboradores ---
+    colaboradores_ordenados = sorted(
+        dados_escala.items(), key=lambda item: item[1].get("nome", "")
+    )
+
+    for matricula, info in colaboradores_ordenados:
+        linha_colab = {
+            "Nome": info.get("nome", matricula),
+            "Cargo": info.get("cargo", ""),
+            "Matrícula": str(matricula),
+            "Conselho": str(info.get("conselho", "")),
+            "Setor": info.get("setor", ""),
+        }
 
         dias_trabalho = {turno["dia"]: turno for turno in info.get("dias", [])}
         escala_data_base = info.get("escala_data_base")
@@ -57,24 +93,65 @@ def exportar_para_excel(dados_escala, ano, mes, caminho_arquivo):
                 if not escala_data_base or data_do_dia >= escala_data_base:
                     valor_celula = "F"
 
-                    if dia_num in dias_trabalho:
-                        turno_info = dias_trabalho[dia_num]
-                        tipo_turno = turno_info.get("turno", "X").upper()
-                        esta_afastado = turno_info.get("em_afastamento", False)
-                        valor_celula = (
-                            f"{tipo_turno}(A)" if esta_afastado else tipo_turno
-                        )
+                    turno_info = dias_trabalho.get(dia_num)
+                    if turno_info:
+                        motivo = turno_info.get("afastamento_motivo")
+                        print(motivo)
+                        if motivo:
+                            valor_celula = MOTIVO_ABBREV.get(
+                                motivo.upper(), motivo[:2].upper()
+                            )
+                        else:
+                            valor_celula = "X"
 
-            linha[dia_num_str] = valor_celula
+            linha_colab[dia_num_str] = valor_celula
 
-        dados_para_df.append(linha)
+        dados_para_df.append(linha_colab)
 
-    df = pd.DataFrame(dados_para_df)
+    # --- Criação do DataFrame Principal (só com dados dos colaboradores) ---
+    df_principal = pd.DataFrame(
+        dados_para_df, columns=colunas_finais
+    )  # Garante a ordem
 
-    colunas_ordenadas = ["Colaborador"] + colunas_dias
-    df = df.reindex(columns=colunas_ordenadas)
-    df.set_index("Colaborador", inplace=True)
-    df.to_excel(caminho_arquivo, sheet_name=f"Escala {mes_nome} {ano}")
+    # --- Exportação para Excel usando XlsxWriter para inserir a linha extra ---
+    try:
+        # Cria o objeto writer
+        writer = pd.ExcelWriter(caminho_arquivo, engine="xlsxwriter")
+
+        # Escreve o DataFrame principal, INCLUINDO o cabeçalho padrão
+        df_principal.to_excel(
+            writer,
+            sheet_name=f"Escala {mes_nome} {ano}",
+            index=False,
+            header=True,
+            startrow=1,
+        )  # Começa na linha 1 (abaixo do cabeçalho)
+
+        # Escreve a linha dos dias da semana ACIMA dos dados, na linha 2 (índice 1 no excel)
+        df_dias_semana.to_excel(
+            writer,
+            sheet_name=f"Escala {mes_nome} {ano}",
+            index=False,
+            header=False,
+            startrow=2,
+        )
+
+        # (Opcional) Ajustar largura das colunas - pode precisar de ajustes finos
+        workbook = writer.book
+        worksheet = writer.sheets[f"Escala {mes_nome} {ano}"]
+        worksheet.set_column("A:A", 30)  # Nome
+        worksheet.set_column("B:B", 20)  # Cargo
+        worksheet.set_column("C:C", 10)  # Matrícula
+        worksheet.set_column("D:D", 10)  # Conselho
+        worksheet.set_column("E:E", 20)  # Setor
+        worksheet.set_column("F:AJ", 4)  # Colunas dos dias (ajuste F:AJ conforme o mês)
+
+        # Salva o arquivo Excel
+        writer.close()  # Use close() em vez de save() para xlsxwriter
+
+        print(f"Planilha Excel gerada com sucesso em: {caminho_arquivo}")
+    except Exception as e:
+        print(f"Erro ao gerar a planilha Excel: {e}")
 
 
 def _draw_footer(canvas, doc):
@@ -178,7 +255,9 @@ def _determinar_sequencia(info_colab):
 
 def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
     """Gera múltiplas tabelas (uma por setor), com espaçamento,
-    e garante que não quebrem entre páginas."""
+    e garante que não quebrem entre páginas, colorindo afastamentos."""
+    from datetime import date
+
     meses_nomes = [
         "JANEIRO",
         "FEVEREIRO",
@@ -197,51 +276,61 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
     num_dias = monthrange(ano, mes)[1]
     dias_semana_abrev = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]
 
-    # --- MUDANÇA: Dicionário de Mapeamento de Motivos ---
     MOTIVO_ABBREV = {
         "ATESTADO": "AT",
         "AFASTADO INSS.": "AF",
+        "AFASTADO INSS": "AF",
+        "ATESTADO ACOMP.": "AC",
+        "ATESTADO ACOMP": "AC",
         "FÉRIAS": "FE",
-        "FERIAS": "FE",  # Variação comum
+        "FERIAS": "FE",
         "LICENÇA MATERNIDADE": "LM",
-        "LICENCA MATERNIDADE": "LM",  # Variação comum
+        "LICENCA MATERNIDADE": "LM",
         "HORA EXTRA": "HE",
         "FOLGA": "F",
     }
-    # --- FIM DA MUDANÇA ---
+    MOTIVO_COLORS = {
+        "ATESTADO": colors.red,
+        "AFASTADO INSS.": colors.HexColor("#00B050"),
+        "AFASTADO INSS": colors.HexColor("#00B050"),
+        "ATESTADO ACOMP.": colors.HexColor("#00B050"),
+        "ATESTADO ACOMP": colors.HexColor("#00B050"),
+        "FÉRIAS": colors.HexColor("#ED7D31"),
+        "FERIAS": colors.HexColor("#ED7D31"),
+        "LICENÇA MATERNIDADE": colors.HexColor("#7030A0"),
+        "LICENCA MATERNIDADE": colors.HexColor("#7030A0"),
+        "HORA EXTRA": colors.HexColor("#00B0F0"),
+        "FOLGA": colors.yellow,
+        "_DEFAULT_": colors.lightgrey,
+    }
 
-    # --- Agrupamento Aninhado (Setor > Escala/Turno) ---
     grupos_de_setor = {}
     for matricula, info in dados_escala.items():
         setor_grupo = info.get("setor", "SETOR NÃO DEFINIDO").upper()
         escala_tipo = info.get("escala", "N/A").upper()
         tipo_turno_bruto = info.get("Tipo_turno", "")
         escala_nome_grupo = ""
-
         if tipo_turno_bruto:
             tipo_turno_limpo = tipo_turno_bruto.split(" ")[0].upper()
             escala_nome_grupo = f"{escala_tipo} - {tipo_turno_limpo}"
         else:
             escala_nome_grupo = escala_tipo
-
         if setor_grupo not in grupos_de_setor:
             grupos_de_setor[setor_grupo] = {}
         if escala_nome_grupo not in grupos_de_setor[setor_grupo]:
             grupos_de_setor[setor_grupo][escala_nome_grupo] = []
         grupos_de_setor[setor_grupo][escala_nome_grupo].append((matricula, info))
 
-    # --- Criação do Documento ---
     doc = SimpleDocTemplate(
         caminho_arquivo,
         pagesize=landscape(letter),
-        topMargin=0.5 * inch,
-        bottomMargin=1.0 * inch,  # Aumenta a margem inferior para caber a legenda
+        topMargin=0.7 * inch,
+        bottomMargin=1.0 * inch,
         leftMargin=0.5 * inch,
         rightMargin=0.5 * inch,
     )
     elementos = []
 
-    # --- Estilos de Parágrafo ---
     styles = getSampleStyleSheet()
     style_titulo = ParagraphStyle(
         "CustomTitle",
@@ -275,12 +364,10 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         "CellWrapCenter", fontSize=7, fontName="Helvetica", alignment=TA_CENTER
     )
 
-    # --- Título Principal ---
     titulo_html = f'ESCALA <font color="red">UMPA STA. LUZIA</font> - {mes_nome} {ano}'
     elementos.append(Paragraph(titulo_html, style_titulo))
     elementos.append(Spacer(1, 0.1 * inch))
 
-    # --- Definições Globais da Tabela ---
     cabecalho_dias = ["NOME", "CARGO", "MATRÍCULA", "CONSELHO"] + [
         str(i) for i in range(1, num_dias + 1)
     ]
@@ -293,7 +380,6 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
     largura_cargo = 1.2 * inch
     largura_matricula = 0.7 * inch
     largura_conselho = 0.7 * inch
-
     largura_disponivel = (
         landscape(letter)[0]
         - largura_col_nome
@@ -309,10 +395,8 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         largura_matricula,
         largura_conselho,
     ] + ([largura_col_dia] * num_dias)
-
     colunas_totais = len(larguras_colunas)
 
-    # --- Estilos de Base ---
     estilos_base = [
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#C6E0B4")),
         ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
@@ -333,7 +417,6 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
         ("LINEBELOW", (0, 1), (-1, 1), 1, colors.black),
     ]
-
     estilos_fds_cabecalho = []
     for dia_num in range(1, num_dias + 1):
         if weekday(ano, mes, dia_num) >= 5:
@@ -347,7 +430,6 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
                 )
             )
 
-    # --- Loop para criar uma tabela por setor ---
     for setor_nome, escalas_do_setor in sorted(grupos_de_setor.items()):
 
         dados_para_esta_tabela = [cabecalho_dias, cabecalho_semana]
@@ -361,9 +443,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
             titulo_setor_cell = ""
             if i == 0:
                 titulo_setor_cell = Paragraph(setor_nome, style_setor_row)
-
             titulo_escala_cell = Paragraph(escala_nome_grupo.upper(), style_escala_row)
-
             linha_titulo = [titulo_setor_cell, "", "", "", titulo_escala_cell] + [
                 ""
             ] * (colunas_totais - 5)
@@ -372,8 +452,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
             cor_fundo_titulo = (
                 colors.HexColor("#C6E0B4") if i == 0 else colors.HexColor("#E2EFD9")
             )
-
-            if i == 0:  # Adiciona espaço ANTES do primeiro título (Setor)
+            if i == 0:
                 estilos_para_esta_tabela.append(
                     ("TOPPADDING", (0, row_index), (-1, row_index), 8)
                 )
@@ -419,31 +498,115 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
                 dias_trabalho = {turno["dia"]: turno for turno in info.get("dias", [])}
                 escala_data_base = info.get("escala_data_base")
 
-                # --- MUDANÇA: LÓGICA DE PREENCHIMENTO DA CÉLULA ---
+                # Obtém dados de afastamento com diferentes nomes de chaves possíveis
+                afastamento_inicio = info.get("afastamento_inicio") or info.get(
+                    "data_inicio_afastamento"
+                )
+                afastamento_fim = info.get("afastamento_fim") or info.get(
+                    "data_fim_afastamento"
+                )
+                afastamento_motivo_geral = info.get("afastamento_motivo") or info.get(
+                    "motivo_afastamento"
+                )
+
+                # DEBUG: Imprime informações de afastamento se existirem
+                if afastamento_inicio or afastamento_fim or afastamento_motivo_geral:
+                    print(
+                        f"\n[DEBUG] Colaborador: {nome_colab} (Matrícula: {matricula})"
+                    )
+                    print(
+                        f"  Afastamento Início: {afastamento_inicio} (tipo: {type(afastamento_inicio)})"
+                    )
+                    print(
+                        f"  Afastamento Fim: {afastamento_fim} (tipo: {type(afastamento_fim)})"
+                    )
+                    print(f"  Motivo: {afastamento_motivo_geral}")
+
+                # Converte strings para objetos date se necessário
+                if isinstance(afastamento_inicio, str):
+                    try:
+                        # Tenta diferentes formatos de data
+                        for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"]:
+                            try:
+                                afastamento_inicio = datetime.strptime(
+                                    afastamento_inicio, fmt
+                                ).date()
+                                break
+                            except:
+                                continue
+                    except:
+                        print(
+                            f"  [ERRO] Não foi possível converter data de início: {afastamento_inicio}"
+                        )
+                        afastamento_inicio = None
+
+                if isinstance(afastamento_fim, str):
+                    try:
+                        for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"]:
+                            try:
+                                afastamento_fim = datetime.strptime(
+                                    afastamento_fim, fmt
+                                ).date()
+                                break
+                            except:
+                                continue
+                    except:
+                        print(
+                            f"  [ERRO] Não foi possível converter data de fim: {afastamento_fim}"
+                        )
+                        afastamento_fim = None
+
+                cor_afastamento = None
+                if afastamento_motivo_geral:
+                    motivo_upper = afastamento_motivo_geral.upper().strip()
+                    cor_afastamento = MOTIVO_COLORS.get(
+                        motivo_upper, MOTIVO_COLORS["_DEFAULT_"]
+                    )
+                    print(
+                        f"  Cor definida: {cor_afastamento} para motivo '{motivo_upper}'"
+                    )
+
+                # --- LÓGICA PARA VALOR DA CÉLULA ---
                 for dia_num in range(1, num_dias + 1):
                     valor_celula_str = ""
                     try:
-                        data_do_dia = datetime(ano, mes, dia_num).date()
+                        data_do_dia = date(ano, mes, dia_num)
                     except ValueError:
                         data_do_dia = None
+                        linha_colab.append("")
+                        continue
 
                     if data_do_dia:
-                        if not escala_data_base or data_do_dia >= escala_data_base:
-                            valor_celula_str = "F"  # Padrão é Folga
+                        # 1. Verifica se está no período de afastamento
+                        is_afastamento_day = False
+                        if (
+                            afastamento_inicio
+                            and afastamento_fim
+                            and afastamento_motivo_geral
+                            and isinstance(afastamento_inicio, date)
+                            and isinstance(afastamento_fim, date)
+                        ):
+                            if afastamento_inicio <= data_do_dia <= afastamento_fim:
+                                is_afastamento_day = True
+                                motivo_upper = afastamento_motivo_geral.upper().strip()
+                                valor_celula_str = MOTIVO_ABBREV.get(
+                                    motivo_upper,
+                                    motivo_upper[:2].upper(),
+                                )
+                                if dia_num == 1:  # Debug apenas no primeiro dia
+                                    print(
+                                        f"  Dia {dia_num}: AFASTAMENTO detectado - '{valor_celula_str}'"
+                                    )
 
-                            turno_info = dias_trabalho.get(dia_num)
-                            
-                            if turno_info:
-                                motivo = turno_info.get("afastamento_motivo")
-                                if motivo:
-                                    valor_celula_str = MOTIVO_ABBREV.get(motivo.upper(), motivo[:2].upper())
-                                else:
-                                    # Se não, é um dia de trabalho normal
-                                    tipo_turno = turno_info.get("turno", "X").upper()
-                                    valor_celula_str = tipo_turno
+                        # 2. Se NÃO for afastamento, verifica trabalho/folga
+                        if not is_afastamento_day:
+                            if not escala_data_base or data_do_dia >= escala_data_base:
+                                valor_celula_str = "F"  # Default é Folga
+                                if dia_num in dias_trabalho:
+                                    valor_celula_str = "X"  # Workday
 
                     linha_colab.append(valor_celula_str)
-                # --- FIM DA MUDANÇA ---
+                # --- FIM DA LÓGICA ---
 
                 dados_para_esta_tabela.append(linha_colab)
 
@@ -461,33 +624,78 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
                     ("BOTTOMPADDING", (0, row_index), (-1, row_index), 3)
                 )
 
-                for dia_num in range(1, num_dias + 1):
-                    if weekday(ano, mes, dia_num) >= 5:
-                        col_index = dia_num + 3
+                # --- Colore o bloco de afastamento ---
+                afastamento_cols_colored = set()
+
+                if (
+                    cor_afastamento
+                    and afastamento_inicio
+                    and afastamento_fim
+                    and isinstance(afastamento_inicio, date)
+                    and isinstance(afastamento_fim, date)
+                ):
+                    primeiro_dia_mes = date(ano, mes, 1)
+                    ultimo_dia_mes = date(ano, mes, num_dias)
+
+                    if (
+                        afastamento_inicio <= ultimo_dia_mes
+                        and afastamento_fim >= primeiro_dia_mes
+                    ):
+                        data_inicio_colorir = max(afastamento_inicio, primeiro_dia_mes)
+                        data_fim_colorir = min(afastamento_fim, ultimo_dia_mes)
+
+                        start_day_month = data_inicio_colorir.day
+                        end_day_month = data_fim_colorir.day
+
+                        start_col_idx = start_day_month + 3
+                        end_col_idx = end_day_month + 3
+
+                        print(
+                            f"  Colorindo colunas {start_col_idx} a {end_col_idx} (dias {start_day_month}-{end_day_month})"
+                        )
+
                         estilos_para_esta_tabela.append(
                             (
                                 "BACKGROUND",
-                                (col_index, row_index),
-                                (col_index, row_index),
-                                colors.HexColor("#E7E6E6"),
+                                (start_col_idx, row_index),
+                                (end_col_idx, row_index),
+                                cor_afastamento,
                             )
                         )
+
+                        if cor_afastamento in [colors.red, colors.HexColor("#7030A0")]:
+                            estilos_para_esta_tabela.append(
+                                (
+                                    "TEXTCOLOR",
+                                    (start_col_idx, row_index),
+                                    (end_col_idx, row_index),
+                                    colors.white,
+                                )
+                            )
+
+                        for col_idx in range(start_col_idx, end_col_idx + 1):
+                            afastamento_cols_colored.add(col_idx)
+
+                # Colore Fim de Semana (se não for afastamento)
+                for dia_num in range(1, num_dias + 1):
+                    if weekday(ano, mes, dia_num) >= 5:
+                        col_index = dia_num + 3
+                        if col_index not in afastamento_cols_colored:
+                            estilos_para_esta_tabela.append(
+                                (
+                                    "BACKGROUND",
+                                    (col_index, row_index),
+                                    (col_index, row_index),
+                                    colors.HexColor("#E7E6E6"),
+                                )
+                            )
 
                 is_even_row = not is_even_row
                 row_index += 1
 
-        # Cria e aplica estilos para a tabela do setor
         tabela_setor = Table(dados_para_esta_tabela, colWidths=larguras_colunas)
         tabela_setor.setStyle(TableStyle(estilos_para_esta_tabela))
-
-        # Adiciona a Tabela e o Espaçador ao PDF
-        bloco_para_manter_junto = [
-            tabela_setor,
-            Spacer(1, 0.2 * inch),  # Espaçador ENTRE setores
-        ]
+        bloco_para_manter_junto = [tabela_setor, Spacer(1, 0.2 * inch)]
         elementos.append(KeepTogether(bloco_para_manter_junto))
 
-    # --- FIM DO LOOP POR SETORES ---
-
-    # Constrói o PDF
     doc.build(elementos, onFirstPage=_draw_footer, onLaterPages=_draw_footer)

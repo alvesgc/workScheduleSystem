@@ -326,34 +326,79 @@ def add_colaborador(dados_colaborador):
             return False, f"Erro de banco de dados: {e}"
 
 
-def get_all_collaborators_dataframe(search_term=None):
-    """Busca os colaboradores, opcionalmente filtrando, e retorna como DataFrame."""
-    if not engine:
-        return pd.DataFrame()
-
-    # A construção da query está correta
-    query_str = """
-        SELECT nome, matricula, cargo, setor, escala
-        FROM colaboradores WHERE ativo = TRUE
+def get_all_active_collaborators(filtros=None):
     """
+    Busca colaboradores ativos, aplicando filtros opcionais.
+    CORRIGIDA: Agora converte corretamente as datas de afastamento.
+    Filtros é um dicionário: {'escala_types': ['12x36'], 'matriculas': ['123']}
+    """
+    if not engine:
+        return []
+
     params = {}
+    query_str = """
+        SELECT matricula, nome, escala, cargo, setor, tipo_turno, escala_data_base, escala_sequencia_atual,
+               afastamento_inicio, afastamento_fim, conselho, afastamento_motivo
+        FROM colaboradores
+        WHERE ativo = 1
+    """
+    if filtros:
+        if filtros.get("escala_types"):
+            in_placeholders = ", ".join(
+                [f":escala_{i}" for i in range(len(filtros["escala_types"]))]
+            )
+            query_str += f" AND escala IN ({in_placeholders})"
+            params.update(
+                {f"escala_{i}": val for i, val in enumerate(filtros["escala_types"])}
+            )
 
-    if search_term:
-        query_str += " AND (nome LIKE :term OR matricula LIKE :term  OR setor LIKE :term OR cargo LIKE :term)"
-        params["term"] = f"%{search_term}%"
+        if filtros.get("matriculas"):
+            in_placeholders = ", ".join(
+                [f":mat_{i}" for i in range(len(filtros["matriculas"]))]
+            )
+            query_str += f" AND matricula IN ({in_placeholders})"
+            params.update(
+                {f"mat_{i}": val for i, val in enumerate(filtros["matriculas"])}
+            )
 
+        if filtros.get("setores"):
+            in_placeholders = ", ".join(
+                [f":setor_{i}" for i in range(len(filtros["setores"]))]
+            )
+            query_str += f" AND setor IN ({in_placeholders})"
+            params.update(
+                {f"setor_{i}": val for i, val in enumerate(filtros["setores"])}
+            )
     query_str += " ORDER BY nome"
 
-    try:
-        # --- A CORREÇÃO ESTÁ AQUI ---
-        # Envolvemos a string da query com a função text() do SQLAlchemy
-        # para garantir que os parâmetros sejam processados corretamente.
-        df = pd.read_sql(text(query_str), engine, params=params)
-        return df
-    except Exception as e:
-        print(f"Erro ao executar a pesquisa no banco de dados: {e}")
-        return pd.DataFrame()
-
+    with engine.connect() as connection:
+        query = text(query_str)
+        result = connection.execute(query, params).fetchall()
+        
+        # Converte para lista de dicionários e processa as datas
+        colaboradores = []
+        for row in result:
+            colab_dict = row._asdict()
+            
+            # ⚠️ CORREÇÃO CRÍTICA: Converte datetime para date
+            if colab_dict.get('afastamento_inicio'):
+                # Se vier como datetime do MySQL, converte para date
+                if hasattr(colab_dict['afastamento_inicio'], 'date'):
+                    colab_dict['afastamento_inicio'] = colab_dict['afastamento_inicio'].date()
+            
+            if colab_dict.get('afastamento_fim'):
+                # Se vier como datetime do MySQL, converte para date
+                if hasattr(colab_dict['afastamento_fim'], 'date'):
+                    colab_dict['afastamento_fim'] = colab_dict['afastamento_fim'].date()
+            
+            if colab_dict.get('escala_data_base'):
+                # Converte escala_data_base também, se necessário
+                if hasattr(colab_dict['escala_data_base'], 'date'):
+                    colab_dict['escala_data_base'] = colab_dict['escala_data_base'].date()
+            
+            colaboradores.append(colab_dict)
+        
+        return colaboradores
 
 def get_collaborator_by_matricula(matricula):
     """Busca os dados de um colaborador, incluindo os campos de afastamento."""
