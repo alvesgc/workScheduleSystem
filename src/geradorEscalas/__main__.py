@@ -331,10 +331,10 @@ class App(ctk.CTk):
         required_file_columns = [
             "Nome",
             "Matrícula",
-            "Cargo",
-            "Setor",
-            "Escala",
-            "Tipo de Turno",
+            # "Cargo",
+            # "Setor",
+            # "Escala",
+            # "Tipo de Turno",
         ]
         # Colunas obrigatórias para um registro ser considerado válido no BD
         required_db_fields = ["Nome", "Matrícula"]
@@ -344,10 +344,10 @@ class App(ctk.CTk):
             tipos_de_dados = {
                 "Nome": str,
                 "Matrícula": str,
-                "Cargo": str,
-                "Setor": str,
-                "Escala": str,
-                "Tipo de Turno": str,
+                # "Cargo": str,
+                # "Setor": str,
+                # "Escala": str,
+                # "Tipo de Turno": str,
             }
             df = pd.read_excel(filepath, dtype=tipos_de_dados)
             # Limpa os valores nulos do Pandas para None do Python
