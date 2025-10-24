@@ -1,5 +1,6 @@
 from calendar import monthrange, weekday
 import os
+import sys
 import customtkinter as ctk
 import tkinter.ttk as ttk
 from tkinter import filedialog, messagebox
@@ -14,6 +15,7 @@ from ...escala_engine import GeradorEscalaEngine
 from ... import database as db
 from .setup_escala_view import SetupEscalaView
 from ..widgets.CTkAdvancedTable import CTkAdvancedTable
+from .orderar_pdf_view import OrdenacaoPdfDialog
 
 ChecklistDropdown = checklist.ChecklistDropdown
 
@@ -340,7 +342,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             image=self.icons.get("pdf"),
             compound="left",
             state="disabled",
-            command=self._exportar_para_pdf,
+            command=self._prompt_pdf_ordenacao,
             fg_color=PRIMARY,
             hover_color=PRIMARY_HOVER,
             height=36,
@@ -973,24 +975,22 @@ class GeradorEscalaView(ctk.CTkFrame):
         SetupEscalaView(
             master=self,
             colaboradores=colaboradores_para_modificar,
-            save_callback=self._handle_modificacao_save,  # <-- AQUI ESTÁ A MUDANÇA
+            save_callback=self._handle_modificacao_save,
             title="Modificar Escala de Colaboradores",
             mode="initial",
         )
 
     def get_selected_matriculas(self):
         """Retorna lista de matrículas selecionadas."""
-        return list(self.selected_matriculas)  # [cite: 39]
+        return list(self.selected_matriculas)  
 
     def update_context_buttons(self):
         """Habilita/desabilita botões baseado na seleção."""
-        # Adaptado de [cite: 38]
         state = "normal" if self.selected_matriculas else "disabled"
         self.modificar_button.configure(state=state)
 
     def on_row_click(self, event):
         """Gerencia cliques nos checkboxes."""
-        # Baseado em [cite: 36-38]
         item_id = self.tree.identify_row(event.y)
         if not item_id:
             return
@@ -998,15 +998,107 @@ class GeradorEscalaView(ctk.CTkFrame):
         # Alterna a seleção
         if item_id in self.selected_matriculas:
             self.selected_matriculas.remove(item_id)
-            self.tree.item(item_id, image=self.img_unchecked)  # [cite: 37]
+            self.tree.item(item_id, image=self.img_unchecked) 
         else:
             self.selected_matriculas.add(item_id)
-            self.tree.item(item_id, image=self.img_checked)  # [cite: 37]
+            self.tree.item(item_id, image=self.img_checked) 
 
-        # Atualiza a seleção visual do CTkAdvancedTable
+
         if self.selected_matriculas:
-            self.tree.selection_set(list(self.selected_matriculas))  # [cite: 37]
+            self.tree.selection_set(list(self.selected_matriculas))  
         else:
-            self.tree.selection_set([])  # [cite: 37]
+            self.tree.selection_set([]) 
 
-        self.update_context_buttons()  # [cite: 38]
+        self.update_context_buttons() 
+        
+    def _prompt_pdf_ordenacao(self):
+        """Abre o pop-up para escolher a ordenação e chama a exportação,
+           garantindo que o pop-up apareça dentro da tela."""
+        if self.ultima_escala_gerada is None:
+            messagebox.showwarning("Aviso", "Gere uma prévia da escala antes de exportar.", parent=self)
+            return
+
+        # --- Calcula a posição do pop-up com verificação de limites ---
+        self.update_idletasks() # Garante coordenadas atualizadas
+
+        # Coordenadas do botão
+        btn_x = self.pdf_button.winfo_rootx()
+        btn_y = self.pdf_button.winfo_rooty()
+        btn_height = self.pdf_button.winfo_height()
+        btn_width = self.pdf_button.winfo_width() # Pega a largura do botão também
+
+        # Dimensões do pop-up (devem ser as mesmas definidas em OrdenacaoPdfDialog)
+        popup_width = 300
+        popup_height = 180
+        margin = 10 # Margem de segurança da borda da tela
+
+        # Posição inicial desejada (abaixo e alinhado à esquerda do botão)
+        tentative_x = btn_x
+        tentative_y = btn_y + btn_height + 5 # Adiciona 5px de espaço vertical
+
+        # Dimensões da tela
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+
+        # Ajusta X se sair pela direita
+        if tentative_x + popup_width > screen_width - margin:
+            # Tenta alinhar à direita do botão
+            tentative_x = btn_x + btn_width - popup_width
+            # Se ainda sair pela esquerda (tela muito estreita), ajusta
+            if tentative_x < margin:
+                 tentative_x = margin
+
+        # Ajusta Y se sair por baixo
+        if tentative_y + popup_height > screen_height - margin:
+            # Tenta posicionar ACIMA do botão
+            tentative_y = btn_y - popup_height - 5
+            # Se ainda sair por cima (tela muito baixa), ajusta
+            if tentative_y < margin:
+                tentative_y = margin
+                
+        final_x = max(margin, tentative_x)
+        final_y = max(margin, tentative_y)
+
+
+        # Passa as coordenadas FINAIS para o diálogo
+        dialog = OrdenacaoPdfDialog(self, x=final_x, y=final_y)
+        self.wait_window(dialog)
+
+        ordenacao = dialog.ordenacao_escolhida
+        if ordenacao:
+            caminho_arquivo = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+                title="Salvar PDF da Escala",
+            )
+            if not caminho_arquivo:
+                return
+
+            try:
+                ano = int(self.ano_var.get())
+                mes_str = self.mes_var.get()
+                mes = list(self.meses_map.keys()).index(mes_str) + 1
+            except (ValueError, AttributeError, IndexError):
+                messagebox.showerror("Erro", "Não foi possível obter o mês e ano selecionados.", parent=self)
+                return
+
+            try:
+                exporters.exportar_para_pdf(
+                    self.ultima_escala_gerada, ano, mes, caminho_arquivo,
+                    ordenar_por=ordenacao
+                )
+                messagebox.showinfo("Sucesso", f"PDF exportado com sucesso para:\n{caminho_arquivo}", parent=self)
+
+                try:
+                    diretorio = os.path.dirname(caminho_arquivo)
+                    if sys.platform == "win32":
+                        os.startfile(diretorio)
+                    elif sys.platform == "darwin":
+                        subprocess.Popen(["open", diretorio])
+                    else:
+                        subprocess.Popen(["xdg-open", diretorio])
+                except Exception as open_err:
+                    print(f"Não foi possível abrir a pasta do arquivo automaticamente: {open_err}")
+
+            except Exception as e:
+                messagebox.showerror("Erro na Exportação", f"Ocorreu um erro ao gerar o PDF:\n{e}", parent=self)

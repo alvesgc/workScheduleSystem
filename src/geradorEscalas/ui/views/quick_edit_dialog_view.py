@@ -13,9 +13,7 @@ class QuickEditDialog(ctk.CTkToplevel):
         self.resizable(False, False)
         self.grab_set()
 
-        # --- CORREÇÃO: Aumentar altura ---
-        width, height = 520, 520 # Aumentado de 480 para 520
-        # --- FIM DA CORREÇÃO ---
+        width, height = 540, 540 # Aumentado de 480 para 520
         x = (self.winfo_screenwidth() // 2) - (width // 2)
         y = (self.winfo_screenheight() // 2) - (height // 2)
         self.geometry(f"{width}x{height}+{x}+{y}")

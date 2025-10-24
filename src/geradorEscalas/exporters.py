@@ -253,14 +253,33 @@ def _determinar_sequencia(info_colab):
     return 2
 
 
-def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
+def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="setor"):
     """Gera múltiplas tabelas (uma por setor), com espaçamento,
     e garante que não quebrem entre páginas, colorindo afastamentos em blocos."""
-    from datetime import date
 
+    if ordenar_por == "cargo":
+        primary_group_key = "cargo"
+        secondary_info_key = "setor"
+        primary_group_label = "CARGO"
+        secondary_column_header = "SETOR"
+    else:  # Padrão é 'setor'
+        primary_group_key = "setor"
+        secondary_info_key = "cargo"
+        primary_group_label = "SETOR"
+        secondary_column_header = "CARGO"
     meses_nomes = [
-        "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
-        "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO",
+        "JANEIRO",
+        "FEVEREIRO",
+        "MARÇO",
+        "ABRIL",
+        "MAIO",
+        "JUNHO",
+        "JULHO",
+        "AGOSTO",
+        "SETEMBRO",
+        "OUTUBRO",
+        "NOVEMBRO",
+        "DEZEMBRO",
     ]
     mes_nome = meses_nomes[mes - 1]
     num_dias = monthrange(ano, mes)[1]
@@ -295,9 +314,12 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
     # Tamanho ideal do bloco (pode ajustar entre 4-7 dias)
     TAMANHO_BLOCO_IDEAL = 5
 
-    grupos_de_setor = {}
+    grupos_primarios = {}
     for matricula, info in dados_escala.items():
-        setor_grupo = info.get("setor", "SETOR NÃO DEFINIDO").upper()
+        grupo_primario_val = info.get(
+            primary_group_key, f"{primary_group_label} NÃO DEFINIDO"
+        ).upper()
+
         escala_tipo = info.get("escala", "N/A").upper()
         tipo_turno_bruto = info.get("Tipo_turno", "")
         escala_nome_grupo = ""
@@ -306,11 +328,14 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
             escala_nome_grupo = f"{escala_tipo} - {tipo_turno_limpo}"
         else:
             escala_nome_grupo = escala_tipo
-        if setor_grupo not in grupos_de_setor:
-            grupos_de_setor[setor_grupo] = {}
-        if escala_nome_grupo not in grupos_de_setor[setor_grupo]:
-            grupos_de_setor[setor_grupo][escala_nome_grupo] = []
-        grupos_de_setor[setor_grupo][escala_nome_grupo].append((matricula, info))
+
+        if grupo_primario_val not in grupos_primarios:
+            grupos_primarios[grupo_primario_val] = {}
+        if escala_nome_grupo not in grupos_primarios[grupo_primario_val]:
+            grupos_primarios[grupo_primario_val][escala_nome_grupo] = []
+        grupos_primarios[grupo_primario_val][escala_nome_grupo].append(
+            (matricula, info)
+        )
 
     doc = SimpleDocTemplate(
         caminho_arquivo,
@@ -359,7 +384,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
     elementos.append(Paragraph(titulo_html, style_titulo))
     elementos.append(Spacer(1, 0.1 * inch))
 
-    cabecalho_dias = ["NOME", "CARGO", "MATRÍCULA", "CONSELHO"] + [
+    cabecalho_dias = ["NOME", secondary_column_header, "MATRÍCULA", "CONSELHO"] + [
         str(i) for i in range(1, num_dias + 1)
     ]
     cabecalho_semana = ["", "", "", ""]
@@ -368,13 +393,13 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         cabecalho_semana.append(dias_semana_abrev[dia_semana_num])
 
     largura_col_nome = 2.0 * inch
-    largura_cargo = 1.2 * inch
+    largura_secondary_col = 1.2 * inch  # Largura da coluna que muda (Cargo/Setor)
     largura_matricula = 0.7 * inch
     largura_conselho = 0.7 * inch
     largura_disponivel = (
         landscape(letter)[0]
         - largura_col_nome
-        - largura_cargo
+        - largura_secondary_col
         - largura_matricula
         - largura_conselho
         - 1 * inch
@@ -382,7 +407,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
     largura_col_dia = largura_disponivel / num_dias
     larguras_colunas = [
         largura_col_nome,
-        largura_cargo,
+        largura_secondary_col,
         largura_matricula,
         largura_conselho,
     ] + ([largura_col_dia] * num_dias)
@@ -421,19 +446,19 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
                 )
             )
 
-    for setor_nome, escalas_do_setor in sorted(grupos_de_setor.items()):
+    for grupo_primario_nome, escalas_do_grupo in sorted(grupos_primarios.items()):
 
         dados_para_esta_tabela = [cabecalho_dias, cabecalho_semana]
         estilos_para_esta_tabela = list(estilos_base) + list(estilos_fds_cabecalho)
         row_index = 2
 
         for i, (escala_nome_grupo, colaboradores_do_grupo) in enumerate(
-            sorted(escalas_do_setor.items())
+            sorted(escalas_do_grupo.items())
         ):
 
             titulo_setor_cell = ""
             if i == 0:
-                titulo_setor_cell = Paragraph(setor_nome, style_setor_row)
+                titulo_setor_cell = Paragraph(grupo_primario_nome, style_setor_row)
             titulo_escala_cell = Paragraph(escala_nome_grupo.upper(), style_escala_row)
             linha_titulo = [titulo_setor_cell, "", "", "", titulo_escala_cell] + [
                 ""
@@ -476,12 +501,12 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
             is_even_row = False
             for matricula, info, _ in dados_ordenados_grupo:
                 nome_colab = info.get("nome", matricula)
-                cargo_real = info.get("cargo", "")
+                secondary_info_val = info.get(secondary_info_key, "")
                 conselho_real = info.get("conselho", "")
 
                 linha_colab = [
                     Paragraph(nome_colab, style_cell_wrap_left),
-                    Paragraph(cargo_real, style_cell_wrap_center),
+                    Paragraph(secondary_info_val, style_cell_wrap_center),
                     str(matricula),
                     str(conselho_real),
                 ]
@@ -496,8 +521,12 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
                 motivo_abbrev = ""
                 if afastamento_motivo_geral:
                     motivo_upper = afastamento_motivo_geral.upper().strip()
-                    cor_afastamento = MOTIVO_COLORS.get(motivo_upper, MOTIVO_COLORS["_DEFAULT_"])
-                    motivo_abbrev = MOTIVO_ABBREV.get(motivo_upper, motivo_upper[:2].upper())
+                    cor_afastamento = MOTIVO_COLORS.get(
+                        motivo_upper, MOTIVO_COLORS["_DEFAULT_"]
+                    )
+                    motivo_abbrev = MOTIVO_ABBREV.get(
+                        motivo_upper, motivo_upper[:2].upper()
+                    )
 
                 # Determina quais dias estão em afastamento
                 dias_afastamento = set()
@@ -509,18 +538,23 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
                 ):
                     primeiro_dia_mes = date(ano, mes, 1)
                     ultimo_dia_mes = date(ano, mes, num_dias)
-                    
-                    if afastamento_inicio <= ultimo_dia_mes and afastamento_fim >= primeiro_dia_mes:
+
+                    if (
+                        afastamento_inicio <= ultimo_dia_mes
+                        and afastamento_fim >= primeiro_dia_mes
+                    ):
                         data_inicio_no_mes = max(afastamento_inicio, primeiro_dia_mes)
                         data_fim_no_mes = min(afastamento_fim, ultimo_dia_mes)
-                        
-                        for dia_num in range(data_inicio_no_mes.day, data_fim_no_mes.day + 1):
+
+                        for dia_num in range(
+                            data_inicio_no_mes.day, data_fim_no_mes.day + 1
+                        ):
                             dias_afastamento.add(dia_num)
 
                 # Preenche as células dos dias
                 for dia_num in range(1, num_dias + 1):
                     valor_celula_str = ""
-                    
+
                     if dia_num in dias_afastamento:
                         # Célula vazia - será preenchida pelo SPAN
                         valor_celula_str = ""
@@ -534,13 +568,15 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
                                     valor_celula_str = "X"
                         except ValueError:
                             valor_celula_str = ""
-                    
+
                     linha_colab.append(valor_celula_str)
 
                 dados_para_esta_tabela.append(linha_colab)
 
                 # Estilos da Linha
-                cor_fundo_zebra = colors.HexColor("#F2F2F2") if is_even_row else colors.white
+                cor_fundo_zebra = (
+                    colors.HexColor("#F2F2F2") if is_even_row else colors.white
+                )
                 estilos_para_esta_tabela.append(
                     ("BACKGROUND", (0, row_index), (-1, row_index), cor_fundo_zebra)
                 )
@@ -554,65 +590,105 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
                 # Cria blocos de afastamento
                 if dias_afastamento and cor_afastamento:
                     dias_ordenados = sorted(dias_afastamento)
-                    
+
                     i = 0
                     while i < len(dias_ordenados):
                         # Calcula tamanho do bloco
                         dias_restantes = len(dias_ordenados) - i
                         tamanho_bloco = min(TAMANHO_BLOCO_IDEAL, dias_restantes)
-                        
+
                         # Se sobrar muito pouco, ajusta
-                        if dias_restantes - tamanho_bloco > 0 and dias_restantes - tamanho_bloco < 3:
+                        if (
+                            dias_restantes - tamanho_bloco > 0
+                            and dias_restantes - tamanho_bloco < 3
+                        ):
                             tamanho_bloco = dias_restantes // 2
-                        
+
                         primeiro_dia_bloco = dias_ordenados[i]
                         ultimo_dia_bloco = dias_ordenados[i + tamanho_bloco - 1]
-                        
+
                         start_col = primeiro_dia_bloco + 3
                         end_col = ultimo_dia_bloco + 3
-                        
+
                         # Aplica SPAN e estilos
                         estilos_para_esta_tabela.append(
                             ("SPAN", (start_col, row_index), (end_col, row_index))
                         )
                         estilos_para_esta_tabela.append(
-                            ("BACKGROUND", (start_col, row_index), (end_col, row_index), cor_afastamento)
+                            (
+                                "BACKGROUND",
+                                (start_col, row_index),
+                                (end_col, row_index),
+                                cor_afastamento,
+                            )
                         )
                         estilos_para_esta_tabela.append(
-                            ("ALIGN", (start_col, row_index), (end_col, row_index), "CENTER")
+                            (
+                                "ALIGN",
+                                (start_col, row_index),
+                                (end_col, row_index),
+                                "CENTER",
+                            )
                         )
                         estilos_para_esta_tabela.append(
-                            ("FONTNAME", (start_col, row_index), (end_col, row_index), "Helvetica-Bold")
+                            (
+                                "FONTNAME",
+                                (start_col, row_index),
+                                (end_col, row_index),
+                                "Helvetica-Bold",
+                            )
                         )
                         estilos_para_esta_tabela.append(
-                            ("FONTSIZE", (start_col, row_index), (end_col, row_index), 8)
+                            (
+                                "FONTSIZE",
+                                (start_col, row_index),
+                                (end_col, row_index),
+                                8,
+                            )
                         )
-                        
+
                         # Cor do texto
                         if cor_afastamento in [colors.red, colors.HexColor("#7030A0")]:
                             estilos_para_esta_tabela.append(
-                                ("TEXTCOLOR", (start_col, row_index), (end_col, row_index), colors.white)
+                                (
+                                    "TEXTCOLOR",
+                                    (start_col, row_index),
+                                    (end_col, row_index),
+                                    colors.white,
+                                )
                             )
-                        
+
                         # Coloca o texto da abreviação na primeira célula do bloco
                         linha_colab[start_col] = motivo_abbrev
-                        
+
                         i += tamanho_bloco
 
                 # Colore Fim de Semana (apenas células não afastadas)
                 for dia_num in range(1, num_dias + 1):
-                    if weekday(ano, mes, dia_num) >= 5 and dia_num not in dias_afastamento:
+                    if (
+                        weekday(ano, mes, dia_num) >= 5
+                        and dia_num not in dias_afastamento
+                    ):
                         col_index = dia_num + 3
                         estilos_para_esta_tabela.append(
-                            ("BACKGROUND", (col_index, row_index), (col_index, row_index), colors.HexColor("#E7E6E6"))
+                            (
+                                "BACKGROUND",
+                                (col_index, row_index),
+                                (col_index, row_index),
+                                colors.HexColor("#E7E6E6"),
+                            )
                         )
 
                 is_even_row = not is_even_row
                 row_index += 1
 
-        tabela_setor = Table(dados_para_esta_tabela, colWidths=larguras_colunas)
-        tabela_setor.setStyle(TableStyle(estilos_para_esta_tabela))
-        bloco_para_manter_junto = [tabela_setor, Spacer(1, 0.2 * inch)]
+        tabela_grupo_primario = Table(dados_para_esta_tabela, colWidths=larguras_colunas)
+        tabela_grupo_primario.setStyle(TableStyle(estilos_para_esta_tabela))
+
+        bloco_para_manter_junto = [
+            tabela_grupo_primario,
+            Spacer(1, 0.2 * inch)
+        ]
         elementos.append(KeepTogether(bloco_para_manter_junto))
 
     doc.build(elementos, onFirstPage=_draw_footer, onLaterPages=_draw_footer)
