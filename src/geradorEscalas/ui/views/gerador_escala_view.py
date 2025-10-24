@@ -49,7 +49,7 @@ class GeradorEscalaView(ctk.CTkFrame):
         try:
             icon_path = "src/geradorEscalas/assets/icons"
             pil_checked = Image.open(
-                os.path.join(icon_path, "checkbox_checked.png") # [cite: 4]
+                os.path.join(icon_path, "checkbox_checked.png")  # [cite: 4]
             ).resize((16, 16), Image.Resampling.LANCZOS)
             pil_unchecked = Image.open(
                 os.path.join(icon_path, "checkbox_unchecked.png")
@@ -57,9 +57,11 @@ class GeradorEscalaView(ctk.CTkFrame):
             self.img_checked = ImageTk.PhotoImage(pil_checked)
             self.img_unchecked = ImageTk.PhotoImage(pil_unchecked)
         except Exception as e:
-            print(f"ERRO: Não foi possível carregar as imagens de checkbox: {e}") # [cite: 5]
+            print(
+                f"ERRO: Não foi possível carregar as imagens de checkbox: {e}"
+            )  # [cite: 5]
             self.img_checked = self.img_unchecked = None
-            
+
         # --- Carrega os dados para os filtros ---
         self.escala_filter_vars = {
             escala: ctk.StringVar(value="on")
@@ -95,6 +97,9 @@ class GeradorEscalaView(ctk.CTkFrame):
             "pdf": fa.icon_to_image(
                 "file-pdf", fill="#FFFFFF", scale_to_height=icon_size
             ),
+            "help": fa.icon_to_image(
+                "question-circle", fill=TEXT_SECONDARY, scale_to_height=icon_size
+            ),
         }
 
         # === LAYOUT PRINCIPAL ===
@@ -105,6 +110,7 @@ class GeradorEscalaView(ctk.CTkFrame):
         header_frame = ctk.CTkFrame(self, fg_color="transparent")
         header_frame.grid(row=0, column=0, sticky="ew", padx=24, pady=(24, 16))
 
+        # Título principal (continua igual)
         ctk.CTkLabel(
             header_frame,
             text="Gerar Escala",
@@ -112,12 +118,40 @@ class GeradorEscalaView(ctk.CTkFrame):
             text_color=TEXT_PRIMARY,
         ).pack(anchor="w", pady=(0, 4))
 
+        # Frame para conter a descrição E o botão de ajuda
+        desc_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        desc_frame.pack(anchor="w", fill="x")
+        # Configura a coluna 0 (onde ficará o texto) para expandir
+        desc_frame.grid_columnconfigure(0, weight=1)
+
+        # Label da Descrição (agora dentro do desc_frame e usando grid)
         ctk.CTkLabel(
-            header_frame,
+            desc_frame,  # <-- Master corrigido
             text="Configure o período e filtros para gerar a escala de trabalho.",
             font=fonts.SUBTITULO,
             text_color=TEXT_SECONDARY,
-        ).pack(anchor="w")
+        ).grid(
+            row=0, column=0, sticky="w"
+        )  # <-- Usa grid na coluna 0
+
+        # Botão de Ajuda (dentro do desc_frame e usando grid)
+        ctk.CTkButton(
+            desc_frame,  # <-- Master correto
+            text="",
+            image=self.icons.get("help"),
+            compound="left",
+            command=self._mostrar_legenda,
+            fg_color="transparent",
+            hover_color=BUTTON_SECONDARY_HOVER,
+            text_color=TEXT_SECONDARY,
+            border_width=1,
+            border_color=BUTTON_SECONDARY_BORDER,
+            height=28,
+            width=28,
+            corner_radius=6,
+        ).grid(
+            row=0, column=1, sticky="w", padx=(10, 0)
+        )  # <-- Usa grid na coluna 1
 
         # === PAINEL DE CONTROLES ===
         controls_container = ctk.CTkFrame(
@@ -387,34 +421,35 @@ class GeradorEscalaView(ctk.CTkFrame):
 
     def _gerar_previa(self):
         unconfigured = db.get_unconfigured_collaborators()
-        
+
         if unconfigured:
             # Formata a lista para a tela de setup (garante o campo data_base_atual)
             colabs_para_setup = [
                 {
-                    "matricula": c.get("matricula"), 
-                    "nome": c.get("nome"), 
-                    "data_base_atual": "" # Vazio, para o SetupView usar today_str
-                } for c in unconfigured
+                    "matricula": c.get("matricula"),
+                    "nome": c.get("nome"),
+                    "data_base_atual": "",  # Vazio, para o SetupView usar today_str
+                }
+                for c in unconfigured
             ]
-            
+
             messagebox.showinfo(
                 "Configuração Pendente",
                 f"Existem {len(colabs_para_setup)} colaborador(es) sem uma data de início de escala. "
                 "Por favor, configure-os agora.",
-                parent=self
+                parent=self,
             )
 
             popup = SetupEscalaView(
-                self, 
-                colaboradores=colabs_para_setup, 
+                self,
+                colaboradores=colabs_para_setup,
                 save_callback=self._on_setup_save,
-                title="Configuração Inicial de Escala", # <-- ADICIONADO
-                mode='initial'                        # <-- ADICIONADO
+                title="Configuração Inicial de Escala",  # <-- ADICIONADO
+                mode="initial",  # <-- ADICIONADO
             )
             self.wait_window(popup)
         else:
-            self._executar_geracao() # Chama a geração normal
+            self._executar_geracao()  # Chama a geração normal
 
     def _on_setup_save(self, updates):
         success, message = db.update_collaborator_base_dates(updates)
@@ -557,9 +592,133 @@ class GeradorEscalaView(ctk.CTkFrame):
                 if ano == today.year and mes == today.month and dia == today.day:
                     self.tree.heading(str(dia), text=f"[{dia}]")
 
+    def _mostrar_legenda(self):
+        # Define as cores
+        PRIMARY = "#0078D7"
+        SURFACE = "#FFFFFF"
+        BORDER = "#E1E4E8"
+        TEXT_PRIMARY = "#1E1E1E"
+        TEXT_SECONDARY = "#6B6B6B"
+        SUCCESS = "#10B981"
+        DANGER = "#DC2626"
+        WARNING = "#F97316"
+        INFO = "#7C3AED"
+
+        popup = ctk.CTkToplevel(self)
+        popup.title("Legenda da Escala")
+        popup.geometry("460x440")
+        popup.transient(self)
+        popup.grab_set()
+        popup.resizable(False, False)
+
+        # Centralizar
+        popup.update_idletasks()
+        w, h = 460, 440
+        x = (popup.winfo_screenwidth() // 2) - (w // 2)
+        y = (popup.winfo_screenheight() // 2) - (h // 2)
+        popup.geometry(f"{w}x{h}+{x}+{y}")
+
+        # --- CORREÇÃO: Container principal modificado ---
+        # O container agora ocupa quase toda a janela e inclui o título
+        container = ctk.CTkFrame(
+            popup, fg_color=SURFACE, border_color=BORDER,
+            border_width=1, corner_radius=12
+        )
+        # Ajustado pady para começar mais perto do topo
+        container.pack(fill="both", expand=True, padx=20, pady=(20, 10))
+        # --- FIM DA CORREÇÃO ---
+
+
+        # --- CORREÇÃO: Título movido para DENTRO do container ---
+        # Removido o 'header' frame
+        ctk.CTkLabel(
+            container, # Master agora é o container principal
+            text="Legenda da Escala",
+            font=fonts.TITULO_SECAO,
+            text_color=TEXT_PRIMARY,
+        ).pack(anchor="w", padx=15, pady=(10, 5)) # Adicionado padx e ajustado pady
+        # --- FIM DA CORREÇÃO ---
+
+
+        # Scroll Frame (agora dentro do container, abaixo do título)
+        scroll_frame = ctk.CTkScrollableFrame(
+            container, fg_color=SURFACE, corner_radius=12,
+            border_width=0 # Remove borda interna se houver
+        )
+        # Ajustado pady para ficar mais próximo do título
+        scroll_frame.pack(fill="both", expand=True, padx=10, pady=(5, 10))
+
+        # --- DADOS DA LEGENDA ---
+        categorias = [
+            ("SÍMBOLOS BÁSICOS", [
+                ("X", "Dia de Trabalho", SUCCESS),
+                ("F", "Folga / Descanso", TEXT_SECONDARY),
+            ]),
+            ("AFASTAMENTOS", [
+                ("AT", "Atestado Médico", DANGER),
+                ("AF", "Afastado INSS", SUCCESS),
+                ("FE", "Férias", WARNING),
+                ("LM", "Licença Maternidade", INFO),
+            ]),
+            ("MARCADORES DE CABEÇALHO", [
+                ("•Dia•", "Final de Semana", TEXT_SECONDARY),
+                ("[Dia]", "Dia Atual", PRIMARY),
+            ])
+        ]
+
+        # --- Lógica de Layout (com linha separadora) ---
+        for titulo, itens in categorias:
+            ctk.CTkLabel(
+                scroll_frame, text=titulo, font=fonts.SUBTITULO,
+                text_color=TEXT_PRIMARY,
+            ).pack(anchor="w", pady=(15, 2), padx=5)
+
+            ctk.CTkFrame(
+                scroll_frame, height=1, fg_color=BORDER, corner_radius=0
+            ).pack(fill="x", padx=5, pady=(0, 5))
+
+            for sigla, desc, cor in itens:
+                linha = ctk.CTkFrame(scroll_frame, fg_color="transparent")
+                linha.pack(fill="x", pady=2, padx=5)
+                linha.grid_columnconfigure(0, weight=0)
+                linha.grid_columnconfigure(1, weight=1)
+
+                sigla_label = ctk.CTkLabel(
+                    linha, text=sigla, width=60,
+                    font=fonts.TEXTO_NORMAL if sigla not in ["•Dia•", "[Dia]"] else fonts.TEXTO_NORMAL,
+                    text_color=cor, anchor="w"
+                )
+                sigla_label.grid(row=0, column=0, sticky="w", padx=(0, 10))
+
+                desc_label = ctk.CTkLabel(
+                    linha, text=desc, font=fonts.TEXTO_NORMAL,
+                    text_color=TEXT_SECONDARY, anchor="w", wraplength=300
+                )
+                desc_label.grid(row=0, column=1, sticky="w")
+        # --- FIM DA LÓGICA ---
+
+        # Botão Entendi
+        ctk.CTkButton(
+            popup, text="Entendi", fg_color=PRIMARY, hover_color="#005EA6",
+            font=fonts.BUTTON_FONT, corner_radius=8, height=42,
+            command=popup.destroy,
+        ).pack(pady=(5, 15))
 
     def _preencher_tabela(self, dados_escala):
-        """Preenche a tabela com 'X' para trabalho e 'F' para folga."""
+        """Preenche a tabela com 'X' para trabalho, 'F' para folga e abreviações para afastamentos."""
+
+        # Dicionário de abreviações (mesmo do PDF)
+        MOTIVO_ABBREV = {
+            "ATESTADO": "AT",
+            "AFASTADO INSS.": "AF",
+            "AFASTADO INSS": "AF",
+            "FÉRIAS": "FE",
+            "FERIAS": "FE",
+            "LICENÇA MATERNIDADE": "LM",
+            "LICENCA MATERNIDADE": "LM",
+            "HORA EXTRA": "HE",
+            "FOLGA": "F",
+        }
 
         mes_numero = self.meses_map[self.mes_var.get()]
         ano = int(self.ano_var.get())
@@ -572,36 +731,65 @@ class GeradorEscalaView(ctk.CTkFrame):
             dias_info = info.get("dias", [])
             dias_de_trabalho = {turno["dia"]: turno for turno in dias_info}
 
-            tem_afastamento = any(turno.get("em_afastamento") for turno in dias_info)
-            tem_escala_critica = info.get("escala") in ["24x72", "24x120"]
-
-            if tem_afastamento:
-                tags_da_linha.append("afastamento")
-            elif dias_de_trabalho:
-                tags_da_linha.append("trabalho")
-
-            if tem_escala_critica:
-                tags_da_linha.append("critical_escala")
-
+            # Obtém dados de afastamento
             escala_data_base = info.get("escala_data_base")
-            
+            afastamento_inicio = info.get("afastamento_inicio")
+            afastamento_fim = info.get("afastamento_fim")
+            afastamento_motivo = info.get("afastamento_motivo")
+
+            # Determina quais dias estão em afastamento
+            dias_afastamento = set()
+            motivo_abbrev = ""
+
+            if (
+                afastamento_inicio
+                and afastamento_fim
+                and afastamento_motivo
+                and isinstance(afastamento_inicio, date)
+                and isinstance(afastamento_fim, date)
+            ):
+                primeiro_dia_mes = date(ano, mes_numero, 1)
+                ultimo_dia_mes = date(ano, mes_numero, num_dias_no_mes)
+
+                # Verifica se há interseção entre o período de afastamento e o mês atual
+                if (
+                    afastamento_inicio <= ultimo_dia_mes
+                    and afastamento_fim >= primeiro_dia_mes
+                ):
+                    data_inicio_no_mes = max(afastamento_inicio, primeiro_dia_mes)
+                    data_fim_no_mes = min(afastamento_fim, ultimo_dia_mes)
+
+                    for dia_num in range(
+                        data_inicio_no_mes.day, data_fim_no_mes.day + 1
+                    ):
+                        dias_afastamento.add(dia_num)
+
+                    # Define a abreviação
+                    motivo_upper = afastamento_motivo.upper().strip()
+                    motivo_abbrev = MOTIVO_ABBREV.get(
+                        motivo_upper, motivo_upper[:2].upper()
+                    )
+
             valores_linha = [info.get("nome", matricula)]
-            
+
             for dia in range(1, 32):
-                valor_celula = ""  # Padrão é VAZIO
+                valor_celula = ""
 
                 if dia <= num_dias_no_mes:
-                    data_do_dia = date(ano, mes_numero, dia)
-                    # CORREÇÃO: Só aplica F/X se houver data base E o dia for >= data base
-                    if escala_data_base and data_do_dia >= escala_data_base:
-                        # Dentro do período válido: padrão é Folga
-                        valor_celula = "F"
-                        
-                        # Se tem trabalho neste dia, marca como X
-                        if dia in dias_de_trabalho:
-                            turno_info = dias_de_trabalho[dia]
-                            esta_afastado = turno_info.get("em_afastamento", False)
-                            valor_celula = "X(A)" if esta_afastado else "X"
+                    # 1. PRIORIDADE: Verifica se está em afastamento
+                    if dia in dias_afastamento:
+                        valor_celula = motivo_abbrev
+
+                    # 2. Se NÃO está afastado, aplica lógica normal
+                    else:
+                        data_do_dia = date(ano, mes_numero, dia)
+                        if escala_data_base and data_do_dia >= escala_data_base:
+                            # Dentro do período válido: padrão é Folga
+                            valor_celula = "F"
+
+                            # Se tem trabalho neste dia, marca como X
+                            if dia in dias_de_trabalho:
+                                valor_celula = "X"
 
                 valores_linha.append(valor_celula)
 
@@ -717,42 +905,47 @@ class GeradorEscalaView(ctk.CTkFrame):
             for matricula, nova_data_str in updates_dict.items():
                 # Aqui usamos a função de banco de dados que já tínhamos
                 db.atualizar_data_base_e_sequencia_padrao(matricula, nova_data_str)
-            
+
             messagebox.showinfo(
-                "Sucesso", 
-                f"{len(updates_dict)} colaborador(es) atualizado(s) com sucesso!", 
-                parent=self
+                "Sucesso",
+                f"{len(updates_dict)} colaborador(es) atualizado(s) com sucesso!",
+                parent=self,
             )
-            
+
             # Regera a prévia para mostrar os dados atualizados
             self._executar_geracao()
 
         except Exception as e:
             messagebox.showerror(
-                "Erro na Atualização", 
-                f"Ocorreu um erro ao atualizar os dados: {e}", 
-                parent=self
+                "Erro na Atualização",
+                f"Ocorreu um erro ao atualizar os dados: {e}",
+                parent=self,
             )
-            
+
     def _modificar_escala_selecionados(self):
-        selecionados_matriculas = self.get_selected_matriculas() # Pega os IIDs (matrículas)
+        selecionados_matriculas = (
+            self.get_selected_matriculas()
+        )  # Pega os IIDs (matrículas)
         if not selecionados_matriculas:
             messagebox.showwarning(
-                "Ninguém Selecionado", 
-                "Por favor, selecione um ou mais colaboradores na tabela para modificar a escala.", # [cite: 134]
-                parent=self
+                "Ninguém Selecionado",
+                "Por favor, selecione um ou mais colaboradores na tabela para modificar a escala.",  # [cite: 134]
+                parent=self,
             )
             return
 
         # 1. Preparar a lista de colaboradores para a tela de setup
         colaboradores_para_modificar = []
-        
+
         # Verifica se os dados dos colaboradores foram carregados
-        if not hasattr(self, 'colaboradores_carregados') or not self.colaboradores_carregados:
+        if (
+            not hasattr(self, "colaboradores_carregados")
+            or not self.colaboradores_carregados
+        ):
             messagebox.showerror(
-                "Erro", 
-                "Dados de colaboradores não encontrados. Gere uma prévia primeiro.", 
-                parent=self
+                "Erro",
+                "Dados de colaboradores não encontrados. Gere uma prévia primeiro.",
+                parent=self,
             )
             return
 
@@ -767,26 +960,28 @@ class GeradorEscalaView(ctk.CTkFrame):
                     try:
                         data_base_str = data_base_obj.strftime("%d/%m/%Y")
                     except Exception:
-                        pass # Deixa em branco se a data for inválida
+                        pass  # Deixa em branco se a data for inválida
 
-                colaboradores_para_modificar.append({
-                    "matricula": matricula,
-                    "nome": colab.get("nome"),
-                    "data_base_atual": data_base_str # Envia no formato DD/MM/AAAA
-                })
+                colaboradores_para_modificar.append(
+                    {
+                        "matricula": matricula,
+                        "nome": colab.get("nome"),
+                        "data_base_atual": data_base_str,  # Envia no formato DD/MM/AAAA
+                    }
+                )
 
         # 2. Chamar a tela SetupEscalaView
         SetupEscalaView(
             master=self,
             colaboradores=colaboradores_para_modificar,
-            save_callback=self._handle_modificacao_save, # <-- AQUI ESTÁ A MUDANÇA
+            save_callback=self._handle_modificacao_save,  # <-- AQUI ESTÁ A MUDANÇA
             title="Modificar Escala de Colaboradores",
-            mode='initial'
+            mode="initial",
         )
-        
+
     def get_selected_matriculas(self):
         """Retorna lista de matrículas selecionadas."""
-        return list(self.selected_matriculas) # [cite: 39]
+        return list(self.selected_matriculas)  # [cite: 39]
 
     def update_context_buttons(self):
         """Habilita/desabilita botões baseado na seleção."""
@@ -804,16 +999,15 @@ class GeradorEscalaView(ctk.CTkFrame):
         # Alterna a seleção
         if item_id in self.selected_matriculas:
             self.selected_matriculas.remove(item_id)
-            self.tree.item(item_id, image=self.img_unchecked) # [cite: 37]
+            self.tree.item(item_id, image=self.img_unchecked)  # [cite: 37]
         else:
             self.selected_matriculas.add(item_id)
-            self.tree.item(item_id, image=self.img_checked) # [cite: 37]
+            self.tree.item(item_id, image=self.img_checked)  # [cite: 37]
 
         # Atualiza a seleção visual do CTkAdvancedTable
         if self.selected_matriculas:
-            self.tree.selection_set(list(self.selected_matriculas)) # [cite: 37]
+            self.tree.selection_set(list(self.selected_matriculas))  # [cite: 37]
         else:
-            self.tree.selection_set([]) # [cite: 37]
+            self.tree.selection_set([])  # [cite: 37]
 
-        self.update_context_buttons() # [cite: 38]
-   
+        self.update_context_buttons()  # [cite: 38]

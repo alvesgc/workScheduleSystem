@@ -296,19 +296,22 @@ def add_colaborador(dados_colaborador):
             )
             # Usa .get() com None como padrão para os campos que podem vir vazios
             params = {
-                "nome": dados_colaborador.get("Nome"),
-                "matricula": dados_colaborador.get("Matrícula"),
-                "cargo": dados_colaborador.get("Cargo"),
-                "setor": dados_colaborador.get("Setor"),
-                "escala": dados_colaborador.get("Escala"),
-                "tipo_turno": dados_colaborador.get("Tipo de Turno"),
-                "conselho": dados_colaborador.get("conselho (opcional)"),
-                "afastamento_inicio": dados_colaborador.get("Início do Afastamento")
+                "nome": dados_colaborador.get("nome"),  # <-- Corrigido
+                "matricula": dados_colaborador.get("matricula"),  # <-- Corrigido
+                "cargo": dados_colaborador.get("cargo"),  # <-- Corrigido
+                "setor": dados_colaborador.get("setor"),  # <-- Corrigido
+                "escala": dados_colaborador.get("escala"),  # <-- Corrigido
+                # Mantém os outros como None se não vierem (parece correto pela sua GUI)
+                "tipo_turno": dados_colaborador.get("tipo_turno"),
+                "conselho": dados_colaborador.get("conselho"),
+                "afastamento_inicio": dados_colaborador.get("afastamento_inicio")
                 or None,
-                "afastamento_fim": dados_colaborador.get("Fim do Afastamento") or None,
-                "afastamento_motivo": dados_colaborador.get("Motivo do Afastamento")
+                "afastamento_fim": dados_colaborador.get("afastamento_fim") or None,
+                "afastamento_motivo": dados_colaborador.get("afastamento_motivo")
                 or None,
-                "ativo": True,
+                "ativo": dados_colaborador.get(
+                    "ativo", True
+                ),  # Pega 'ativo' ou assume True
             }
             connection.execute(sql, params)
             trans.commit()
@@ -374,31 +377,36 @@ def get_all_active_collaborators(filtros=None):
     with engine.connect() as connection:
         query = text(query_str)
         result = connection.execute(query, params).fetchall()
-        
+
         # Converte para lista de dicionários e processa as datas
         colaboradores = []
         for row in result:
             colab_dict = row._asdict()
-            
+
             # ⚠️ CORREÇÃO CRÍTICA: Converte datetime para date
-            if colab_dict.get('afastamento_inicio'):
+            if colab_dict.get("afastamento_inicio"):
                 # Se vier como datetime do MySQL, converte para date
-                if hasattr(colab_dict['afastamento_inicio'], 'date'):
-                    colab_dict['afastamento_inicio'] = colab_dict['afastamento_inicio'].date()
-            
-            if colab_dict.get('afastamento_fim'):
+                if hasattr(colab_dict["afastamento_inicio"], "date"):
+                    colab_dict["afastamento_inicio"] = colab_dict[
+                        "afastamento_inicio"
+                    ].date()
+
+            if colab_dict.get("afastamento_fim"):
                 # Se vier como datetime do MySQL, converte para date
-                if hasattr(colab_dict['afastamento_fim'], 'date'):
-                    colab_dict['afastamento_fim'] = colab_dict['afastamento_fim'].date()
-            
-            if colab_dict.get('escala_data_base'):
+                if hasattr(colab_dict["afastamento_fim"], "date"):
+                    colab_dict["afastamento_fim"] = colab_dict["afastamento_fim"].date()
+
+            if colab_dict.get("escala_data_base"):
                 # Converte escala_data_base também, se necessário
-                if hasattr(colab_dict['escala_data_base'], 'date'):
-                    colab_dict['escala_data_base'] = colab_dict['escala_data_base'].date()
-            
+                if hasattr(colab_dict["escala_data_base"], "date"):
+                    colab_dict["escala_data_base"] = colab_dict[
+                        "escala_data_base"
+                    ].date()
+
             colaboradores.append(colab_dict)
-        
+
         return colaboradores
+
 
 def get_collaborator_by_matricula(matricula):
     """Busca os dados de um colaborador, incluindo os campos de afastamento."""
@@ -590,6 +598,7 @@ def get_all_collaborators_dataframe(search_term=None):
     except Exception as e:
         print(f"Erro ao executar a pesquisa no banco de dados: {e}")
         return pd.DataFrame()
+
 
 def get_unconfigured_collaborators():
     """Busca colaboradores com escalas cíclicas que não têm uma data base definida."""

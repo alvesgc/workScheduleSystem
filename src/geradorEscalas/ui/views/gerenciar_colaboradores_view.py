@@ -8,7 +8,7 @@ from PIL import Image, ImageTk
 import os
 import tkfontawesome as fa
 from ..widgets.CTkAdvancedTable import CTkAdvancedTable
-
+from .quick_edit_dialog_view import QuickEditDialog
 
 class GerenciarColaboradoresView(ctk.CTkFrame):
     def __init__(self, master, app_controller, data_to_load=None):
@@ -293,6 +293,11 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             "escala",
             "tipo_turno",
         ]
+
+        # Se há observações (dados inválidos), adiciona coluna
+        if "_observacao" in df.columns:
+            colunas_visiveis.append("_observacao")
+
         colunas_df = [col for col in colunas_visiveis if col in df.columns]
 
         # === CRIA TABELA ===
@@ -313,6 +318,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             "setor": {"text": "Setor", "width": 180},
             "escala": {"text": "Escala", "width": 100},
             "tipo_turno": {"text": "Tipo de Turno", "width": 120},
+            "_observacao": {"text": "Observação", "width": 250},
         }
 
         for col in colunas_df:
@@ -322,19 +328,55 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
 
         # === PREENCHE DADOS ===
         self.table_data = df.to_dict("records")
+        used_iids = set()  # Controle de IDs únicos
 
         for i, record in enumerate(self.table_data):
-            iid = str(record.get("matricula", f"temp_id_{i}"))
+            # Gera um ID único para cada linha
+            matricula = record.get("matricula", "")
+
+            # Se matrícula está vazia ou já foi usada, cria ID temporário único
+            if not matricula or str(matricula).strip() == "":
+                iid = f"temp_sem_matricula_{i}"
+            else:
+                base_iid = str(matricula).strip()
+                # Se o ID já existe, adiciona sufixo
+                if base_iid in used_iids:
+                    counter = 1
+                    while f"{base_iid}_dup_{counter}" in used_iids:
+                        counter += 1
+                    iid = f"{base_iid}_dup_{counter}"
+                else:
+                    iid = base_iid
+
+            used_iids.add(iid)
+
             row_tag = "evenrow" if i % 2 == 0 else "oddrow"
             valores = [record.get(col, "") for col in colunas_df]
-            self.tree.insert(
-                "",
-                "end",
-                iid=iid,
-                image=self.img_unchecked,
-                values=valores,
-                tags=(row_tag,),
-            )
+
+            try:
+                self.tree.insert(
+                    "",
+                    "end",
+                    iid=iid,
+                    image=self.img_unchecked,
+                    values=valores,
+                    tags=(row_tag,),
+                )
+            except Exception as e:
+                print(f"ERRO ao inserir linha {i} com iid '{iid}': {e}")
+                # Tenta com ID alternativo em caso de erro
+                alternative_iid = f"row_{i}_{hash(str(record))}"
+                try:
+                    self.tree.insert(
+                        "",
+                        "end",
+                        iid=alternative_iid,
+                        image=self.img_unchecked,
+                        values=valores,
+                        tags=(row_tag,),
+                    )
+                except Exception as e2:
+                    print(f"ERRO CRÍTICO ao inserir linha {i}: {e2}")
 
         self.tree.bind("<Button-1>", self.on_row_click)
         self.update_context_buttons()
@@ -384,19 +426,132 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
 
         if len(matriculas_selecionadas) == 1:
             # Edição única
-            self.app_controller.show_cadastro_manual_view(
-                matricula_para_editar=matriculas_selecionadas[0]
-            )
+            iid_selecionado = matriculas_selecionadas[0]
+
+            # Busca o registro correspondente na table_data
+            registro_para_editar = None
+            indice_registro = None
+
+            for i, record in enumerate(self.table_data):
+                # Verifica se é o registro correto comparando o IID
+                matricula = record.get("matricula", "")
+
+                # Recria a lógica do IID para encontrar o registro correto
+                if not matricula or str(matricula).strip() == "":
+                    iid_esperado = f"temp_sem_matricula_{i}"
+                else:
+                    iid_esperado = str(matricula).strip()
+
+                # Verifica se o IID corresponde (considera duplicatas)
+                if iid_selecionado == iid_esperado or iid_selecionado.startswith(
+                    f"{iid_esperado}_dup_"
+                ):
+                    registro_para_editar = record
+                    indice_registro = i
+                    break
+                elif iid_selecionado == f"temp_sem_matricula_{i}":
+                    registro_para_editar = record
+                    indice_registro = i
+                    break
+
+            if registro_para_editar:
+                # Se tem matrícula válida, passa para edição normal
+                matricula_valida = registro_para_editar.get("matricula", "")
+                if matricula_valida and str(matricula_valida).strip():
+                    self.app_controller.show_cadastro_manual_view(
+                        matricula_para_editar=matricula_valida
+                    )
+                else:
+                    # Se não tem matrícula, abre diálogo para completar os dados
+                    self._open_quick_edit_dialog(
+                        registro_para_editar, indice_registro, iid_selecionado
+                    )
+            else:
+                messagebox.showerror(
+                    "Erro",
+                    "Não foi possível localizar o registro selecionado.",
+                    parent=self,
+                )
         else:
             # Edição em lote
             dados_selecionados = []
-            for record in self.table_data:
-                iid = str(record.get("matricula", ""))
-                if iid in matriculas_selecionadas:
-                    dados_selecionados.append(record)
+            registros_incompletos = []
 
-            self.app_controller.show_edicao_lote_view(dados_selecionados)
+            for iid_selecionado in matriculas_selecionadas:
+                for i, record in enumerate(self.table_data):
+                    matricula = record.get("matricula", "")
 
+                    # Recria a lógica do IID
+                    if not matricula or str(matricula).strip() == "":
+                        iid_esperado = f"temp_sem_matricula_{i}"
+                    else:
+                        iid_esperado = str(matricula).strip()
+
+                    # Verifica correspondência
+                    if iid_selecionado == iid_esperado or iid_selecionado.startswith(
+                        f"{iid_esperado}_dup_"
+                    ):
+                        # Verifica se tem dados completos
+                        if matricula and str(matricula).strip():
+                            dados_selecionados.append(record)
+                        else:
+                            registros_incompletos.append(record.get("nome", "Sem nome"))
+                        break
+                    elif iid_selecionado == f"temp_sem_matricula_{i}":
+                        registros_incompletos.append(record.get("nome", "Sem nome"))
+                        break
+
+            if registros_incompletos:
+                messagebox.showwarning(
+                    "Edição em Lote Não Permitida",
+                    f"A edição em lote não pode ser realizada porque {len(registros_incompletos)} "
+                    f"registro(s) selecionado(s) possui(em) dados incompletos.\n\n"
+                    f"Complete os dados obrigatórios (Nome e Matrícula) editando individualmente "
+                    f"cada registro antes de usar a edição em lote.",
+                    parent=self,
+                )
+                return
+
+            if dados_selecionados:
+                self.app_controller.show_edicao_lote_view(dados_selecionados)
+            else:
+                messagebox.showerror(
+                    "Erro",
+                    "Não foi possível localizar os registros selecionados.",
+                    parent=self,
+                )
+
+    def _open_quick_edit_dialog(self, registro, indice, iid):
+        # Define um dicionário com as cores necessárias para o diálogo
+        colors_for_dialog = {
+            "PRIMARY": self.PRIMARY,
+            "PRIMARY_HOVER": self.PRIMARY_HOVER,
+            "SURFACE": self.SURFACE,
+            "BORDER": self.BORDER,
+            "TEXT_PRIMARY": self.TEXT_PRIMARY,
+            "TEXT_SECONDARY": self.TEXT_SECONDARY,
+            "BUTTON_SECONDARY": self.BUTTON_SECONDARY,
+            "BUTTON_SECONDARY_HOVER": self.BUTTON_SECONDARY_HOVER,
+            "BUTTON_SECONDARY_BORDER": self.BUTTON_SECONDARY_BORDER,
+            "DANGER": self.DANGER,
+            "DANGER_HOVER": self.DANGER_HOVER,
+        }
+
+        # Função callback que será chamada pelo diálogo ao salvar
+        def handle_quick_save(dados_completos):
+            sucesso, msg = db.add_colaborador(dados_completos)
+            if sucesso:
+                self.update_table() # Atualiza a tabela principal
+            else:
+                messagebox.showerror("Erro ao Salvar", msg or "Erro desconhecido ao salvar.", parent=self)
+
+        # Cria e espera o diálogo
+        dialog = QuickEditDialog(
+            master=self,
+            registro=registro,
+            save_callback=handle_quick_save,
+            colors_dict=colors_for_dialog
+        )
     def delete_selected(self):
         """Exclui colaboradores selecionados."""
         matriculas = self.get_selected_matriculas()
@@ -408,12 +563,71 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
             )
             return
 
-        if messagebox.askyesno(
-            "Confirmar Exclusão",
-            f"Tem certeza que deseja excluir {len(matriculas)} colaborador(es)?",
-            parent=self,
-        ):
-            self.app_controller.on_delete_collaborators(matriculas)
+        # Separa registros válidos e inválidos
+        matriculas_validas = []
+        registros_invalidos = []
+
+        for iid_selecionado in matriculas:
+            for i, record in enumerate(self.table_data):
+                matricula = record.get("matricula", "")
+
+                # Recria a lógica do IID
+                if not matricula or str(matricula).strip() == "":
+                    iid_esperado = f"temp_sem_matricula_{i}"
+                else:
+                    iid_esperado = str(matricula).strip()
+
+                # Verifica correspondência
+                if iid_selecionado == iid_esperado or iid_selecionado.startswith(
+                    f"{iid_esperado}_dup_"
+                ):
+                    if matricula and str(matricula).strip():
+                        matriculas_validas.append(matricula)
+                    else:
+                        registros_invalidos.append(i)
+                    break
+                elif iid_selecionado == f"temp_sem_matricula_{i}":
+                    registros_invalidos.append(i)
+                    break
+
+        # Monta mensagem de confirmação
+        msg_parts = []
+        if matriculas_validas:
+            msg_parts.append(f"{len(matriculas_validas)} colaborador(es) cadastrado(s)")
+        if registros_invalidos:
+            msg_parts.append(f"{len(registros_invalidos)} registro(s) incompleto(s)")
+
+        mensagem = f"Tem certeza que deseja excluir {' e '.join(msg_parts)}?"
+
+        if messagebox.askyesno("Confirmar Exclusão", mensagem, parent=self):
+            # Exclui do banco os que têm matrícula
+            if matriculas_validas:
+                self.app_controller.on_delete_collaborators(matriculas_validas)
+
+            # Remove registros inválidos da tabela
+            if registros_invalidos:
+                # Ordena de trás pra frente para não bagunçar os índices
+                for idx in sorted(registros_invalidos, reverse=True):
+                    if idx < len(self.table_data):
+                        self.table_data.pop(idx)
+
+                # Atualiza a tabela mantendo apenas os registros restantes
+                registros_restantes = [
+                    r
+                    for i, r in enumerate(self.table_data)
+                    if "_observacao" in r  # Mantém apenas os inválidos
+                ]
+
+                if registros_restantes:
+                    self.update_table(invalid_rows=registros_restantes)
+                else:
+                    self.update_table()
+
+                messagebox.showinfo(
+                    "Exclusão Concluída",
+                    f"{len(registros_invalidos)} registro(s) incompleto(s) removido(s) da lista.",
+                    parent=self,
+                )
 
     def perform_search(self, event=None):
         """Executa a busca."""

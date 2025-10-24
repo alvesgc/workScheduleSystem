@@ -270,8 +270,6 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo):
         "ATESTADO": "AT",
         "AFASTADO INSS.": "AF",
         "AFASTADO INSS": "AF",
-        "ATESTADO ACOMP.": "AC",
-        "ATESTADO ACOMP": "AC",
         "FÉRIAS": "FE",
         "FERIAS": "FE",
         "LICENÇA MATERNIDADE": "LM",

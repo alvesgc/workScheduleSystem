@@ -1,4 +1,5 @@
 import os
+import traceback
 import tksvg
 import re
 import shutil
@@ -20,6 +21,7 @@ from .ui.views import (
 )
 from . import database as db
 from . import fonts
+
 # --- CONFIGURAÇÕES GLOBAIS ---
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
@@ -87,22 +89,25 @@ def run_import_colaboradores(parent_window):
 def run_save_colaborador(dados_colaborador):
     pass
 
+
 APP_VERSION = "1.0.0"
+
 
 # --- CONTROLADOR PRINCIPAL / JANELA DA APLICAÇÃO ---
 class App(ctk.CTk):
     def __init__(self):
-        super().__init__()   
-             
+        super().__init__()
+
         style = ttk.Style()
         style.theme_use("clam")
         fonts.init_fonts()
 
-
-# Este comando vai imprimir o caminho exato da pasta da biblioteca tksvg
+        # Este comando vai imprimir o caminho exato da pasta da biblioteca tksvg
         print(os.path.dirname(tksvg.__file__))
         try:
-            font_path = resource_path(os.path.join("src", "geradorEscalas", "assets", "fonts", "fa-solid.otf"))
+            font_path = resource_path(
+                os.path.join("src", "geradorEscalas", "assets", "fonts", "fa-solid.otf")
+            )
             fa.set_font_path(font_path)
             print("Fonte FontAwesome carregada com sucesso.")
         except Exception as e:
@@ -148,10 +153,10 @@ class App(ctk.CTk):
         self.title(f"Gerador de Escalas - Painel Principal - v{APP_VERSION}")
         if self.current_user_info:
             self._show_view(
-                MainView, 
-                app_controller=self, 
+                MainView,
+                app_controller=self,
                 user_data=self.current_user_info,
-                app_version=APP_VERSION # <-- Passa a versão para a MainView
+                app_version=APP_VERSION,  # <-- Passa a versão para a MainView
             )
         else:
             messagebox.showerror(
@@ -188,12 +193,14 @@ class App(ctk.CTk):
         reg_window.geometry("400x600")
         reg_window.resizable(False, False)
 
-        reg_window.update_idletasks() # Força a atualização das dimensões da janela
+        reg_window.update_idletasks()  # Força a atualização das dimensões da janela
         width = reg_window.winfo_width()
         height = reg_window.winfo_height()
         x = (reg_window.winfo_screenwidth() // 2) - (width // 2)
         y = (reg_window.winfo_screenheight() // 2) - (height // 2)
-        reg_window.geometry(f"{width}x{height}+{x}+{y}") # Define a posição centralizada
+        reg_window.geometry(
+            f"{width}x{height}+{x}+{y}"
+        )  # Define a posição centralizada
 
         view = UserRegistrationView(
             reg_window,
@@ -205,7 +212,7 @@ class App(ctk.CTk):
         reg_window.transient(self)
         reg_window.grab_set()
         reg_window.focus()
-        
+
     def on_save_colaborador(self, dados, matricula_original=None):
         """
         Salva um novo colaborador ou atualiza um existente.
@@ -274,7 +281,7 @@ class App(ctk.CTk):
                     parent=window_to_close,
                 )
                 return
-            
+
         role_padrao = "user"
         success, message = db.add_user(
             username, password, role_padrao, photo_path=db_photo_path
@@ -304,7 +311,9 @@ class App(ctk.CTk):
         """Abre a tela de cadastro/edição manual diretamente."""
         # Esta função agora usa o _show_view para trocar o conteúdo da MainView
         if isinstance(self.current_view, MainView):
-            self.current_view.show_cadastro_manual_view(matricula_para_editar=matricula_para_editar)
+            self.current_view.show_cadastro_manual_view(
+                matricula_para_editar=matricula_para_editar
+            )
 
     def on_import_colaboradores(self):
         """
@@ -359,17 +368,57 @@ class App(ctk.CTk):
             valid_rows = []
             invalid_rows = []
 
+            # Mapeamento de colunas do Excel para o formato do banco de dados
+            column_mapping = {
+                "Nome": "nome",
+                "Matrícula": "matricula",
+                "Cargo": "cargo",
+                "Setor": "setor",
+                "Escala": "escala",
+                "Tipo de Turno": "tipo_turno",
+            }
+
             # 2. Separa as linhas em válidas e inválidas
             for index, row in df.iterrows():
-                # Verifica se os campos obrigatórios da linha têm conteúdo
+                # Converte a linha para dicionário com nomes padronizados
+                row_dict = {}
+                
+                # Processa cada coluna obrigatória
+                for col_excel, col_db in column_mapping.items():
+                    value = row.get(col_excel)
+                    # Limpa o valor se for string
+                    if isinstance(value, str):
+                        value = value.strip()
+                        # Converte string vazia para None
+                        if value == "" or value.lower() == "none":
+                            value = None
+                    # Se for NaN ou None, converte para None
+                    elif pd.isna(value):
+                        value = None
+                    
+                    # Usa o nome da coluna do banco de dados
+                    row_dict[col_db] = value
+                
+                # Verifica se os campos obrigatórios têm conteúdo válido
+                # Usa os nomes padronizados do banco (minúsculas)
+                required_db_fields_normalized = ["nome", "matricula"]
                 is_valid = all(
-                    row.get(col) and str(row.get(col)).strip() not in ["", "None"]
-                    for col in required_db_fields
+                    row_dict.get(col) is not None and row_dict.get(col) != ""
+                    for col in required_db_fields_normalized
                 )
+                
                 if is_valid:
-                    valid_rows.append(row.to_dict())
+                    valid_rows.append(row_dict)
                 else:
-                    invalid_rows.append(row.to_dict())
+                    # Identifica quais campos estão faltando (usando nomes legíveis)
+                    missing_fields = []
+                    if not row_dict.get("nome"):
+                        missing_fields.append("Nome")
+                    if not row_dict.get("matricula"):
+                        missing_fields.append("Matrícula")
+                    
+                    row_dict["_observacao"] = f"Campos obrigatórios faltando: {', '.join(missing_fields)}"
+                    invalid_rows.append(row_dict)
 
             # 3. Insere as linhas válidas no banco de dados
             sucesso, falhas = 0, 0
@@ -381,28 +430,53 @@ class App(ctk.CTk):
                     falhas += 1
 
             # 4. Prepara a mensagem de resumo
-            info_message = f"{sucesso} colaboradores válidos importados com sucesso."
+            total_processados = len(valid_rows) + len(invalid_rows)
+            info_parts = []
+            
+            if sucesso > 0:
+                info_parts.append(f"✓ {sucesso} colaborador(es) importado(s) com sucesso")
+            
             if falhas > 0:
-                info_message += f"\n{falhas} falharam (ex: matrículas duplicadas)."
+                info_parts.append(f"✗ {falhas} falharam (ex: matrículas duplicadas)")
+            
+            if len(invalid_rows) > 0:
+                info_parts.append(
+                    f"⚠ {len(invalid_rows)} registro(s) com dados incompletos "
+                    f"foram carregados para revisão"
+                )
+            
+            info_message = "\n".join(info_parts)
 
-            # 5. Se houver linhas inválidas, navega para a tela de gerenciamento com elas
-            if invalid_rows:
-                info_message += f"\n\n{len(invalid_rows)} colaboradores com dados faltantes foram carregados na tabela para sua revisão."
-                messagebox.showinfo("Importação Parcial", info_message, parent=self)
-                # Navega para a tela de colaboradores, passando apenas os inválidos
+            # 5. Decide o fluxo baseado nos resultados
+            if len(invalid_rows) > 0:
+                # Há registros inválidos - navega para tela de correção
+                messagebox.showinfo(
+                    "Importação Parcial", 
+                    info_message + "\n\nRevise e complete os dados na próxima tela.",
+                    parent=self
+                )
+                
+                # Navega para a tela de colaboradores com os registros inválidos
                 if isinstance(self.current_view, MainView):
                     self.current_view.show_colaboradores_view(invalid_rows=invalid_rows)
             else:
-                messagebox.showinfo("Importação Concluída", info_message, parent=self)
-                # Se tudo estiver ok, apenas atualiza a tabela com todos os dados do banco
+                # Tudo foi importado com sucesso
+                if sucesso > 0:
+                    messagebox.showinfo("Importação Concluída", info_message, parent=self)
+                
+                # Atualiza a tela com todos os dados do banco
                 if isinstance(self.current_view, MainView):
                     self.current_view.show_colaboradores_view()
 
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"ERRO na importação:\n{error_details}")
             messagebox.showerror(
-                "Erro", f"Ocorreu um erro ao processar a planilha: {e}", parent=self
+                "Erro", 
+                f"Ocorreu um erro ao processar a planilha:\n\n{str(e)}", 
+                parent=self
             )
-
     def on_delete_collaborators(self, matriculas):
         """Deleta múltiplos colaboradores e atualiza a tabela."""
         success, message = db.delete_collaborators_by_matriculas(matriculas)
