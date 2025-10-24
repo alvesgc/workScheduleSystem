@@ -711,7 +711,6 @@ class GeradorEscalaView(ctk.CTkFrame):
         MOTIVO_ABBREV = {
             "ATESTADO": "AT",
             "AFASTADO INSS.": "AF",
-            "AFASTADO INSS": "AF",
             "FÉRIAS": "FE",
             "FERIAS": "FE",
             "LICENÇA MATERNIDADE": "LM",
