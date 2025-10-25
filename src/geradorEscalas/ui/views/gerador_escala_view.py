@@ -51,7 +51,7 @@ class GeradorEscalaView(ctk.CTkFrame):
         try:
             icon_path = "src/geradorEscalas/assets/icons"
             pil_checked = Image.open(
-                os.path.join(icon_path, "checkbox_checked.png")  # [cite: 4]
+                os.path.join(icon_path, "checkbox_checked.png") 
             ).resize((16, 16), Image.Resampling.LANCZOS)
             pil_unchecked = Image.open(
                 os.path.join(icon_path, "checkbox_unchecked.png")
@@ -61,7 +61,7 @@ class GeradorEscalaView(ctk.CTkFrame):
         except Exception as e:
             print(
                 f"ERRO: Não foi possível carregar as imagens de checkbox: {e}"
-            )  # [cite: 5]
+            )  
             self.img_checked = self.img_unchecked = None
 
         # --- Carrega os dados para os filtros ---
@@ -930,7 +930,7 @@ class GeradorEscalaView(ctk.CTkFrame):
         if not selecionados_matriculas:
             messagebox.showwarning(
                 "Ninguém Selecionado",
-                "Por favor, selecione um ou mais colaboradores na tabela para modificar a escala.",  # [cite: 134]
+                "Por favor, selecione um ou mais colaboradores na tabela para modificar a escala.",
                 parent=self,
             )
             return
