@@ -150,7 +150,7 @@ class App(ctk.CTk):
             )
 
     def show_main_view(self):
-        self.title(f"Gerador de Escalas - Painel Principal - v{APP_VERSION}")
+        self.title(f"Gerador de Escalas - v{APP_VERSION}")
         if self.current_user_info:
             self._show_view(
                 MainView,
