@@ -8,12 +8,15 @@ from reportlab.platypus import (
     Paragraph,
     Spacer,
     KeepTogether,
+    Image,
 )
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from datetime import date, datetime
+import os
+from .utils import resource_path
 
 
 def exportar_para_excel(dados_escala, ano, mes, caminho_arquivo):
@@ -154,17 +157,143 @@ def exportar_para_excel(dados_escala, ano, mes, caminho_arquivo):
         print(f"Erro ao gerar a planilha Excel: {e}")
 
 
-def _draw_footer(canvas, doc):
-    """
-    Desenha o rodapé com a legenda colorida e as informações de impressão,
-    CENTRALIZANDO ambos dentro das margens da página.
-    """
+def _draw_header(canvas, doc, mes_nome, ano, logo_path):
+    """Desenha o cabeçalho com logo e título diretamente no canvas."""
     canvas.saveState()
 
-    # 1. Definição da Legenda (como antes)
+    page_width, page_height = landscape(letter)
+    usable_width = page_width - doc.leftMargin - doc.rightMargin
+
+    # Configuração do Logo - dimensões ainda maiores
+    logo_img_obj = None
+    logo_max_width = 3.0 * inch  # Aumentado de 2.5 para 3.0
+    logo_max_height = 1.2 * inch  # Aumentado de 1.0 para 1.2
+    logo_width = 0
+    logo_height = 0
+    spacing = 0.3 * inch
+
+    # Carrega a logo com alta qualidade
+    if logo_path and os.path.exists(logo_path):
+        try:
+            # Usa preserveAspectRatio para manter qualidade
+            from reportlab.lib.utils import ImageReader
+
+            img_reader = ImageReader(logo_path)
+            img_width, img_height = img_reader.getSize()
+
+            # Calcula proporção para manter aspecto
+            aspect = img_width / float(img_height)
+
+            # Ajusta dimensões mantendo aspecto (prioriza altura para melhor visibilidade)
+            if aspect > (logo_max_width / logo_max_height):
+                # Imagem mais larga - limita pela largura
+                logo_width = logo_max_width
+                logo_height = logo_max_width / aspect
+            else:
+                # Imagem mais alta - limita pela altura
+                logo_height = logo_max_height
+                logo_width = logo_max_height * aspect
+
+            # Cria o objeto Image com as dimensões calculadas
+            logo_img_obj = Image(logo_path, width=logo_width, height=logo_height)
+
+            print(
+                f'✓ Logo carregada: {logo_width:.2f}" x {logo_height:.2f}" (original: {img_width}x{img_height}px)'
+            )
+        except Exception as e:
+            print(f"✗ Erro ao carregar logo: {e}")
+            logo_img_obj = None
+            logo_width = 0
+            logo_height = 0
+
+    # Configuração do Título - alinhamento e tamanho
+    styles = getSampleStyleSheet()
+    style_titulo_header = ParagraphStyle(
+        "HeaderTitle",
+        parent=styles["Heading1"],
+        fontSize=20,  # Aumentado de 18 para 20
+        textColor=colors.black,
+        alignment=TA_LEFT,
+        fontName="Helvetica-Bold",
+        leading=24,  # Aumentado de 22 para 24
+    )
+
+    titulo_html = f'ESCALA <font color="red">UMPA STA. LUZIA</font> - {mes_nome} {ano}'
+    title_paragraph = Paragraph(titulo_html, style_titulo_header)
+
+    # Calcula largura disponível para o título
+    if logo_img_obj:
+        available_width_for_title = usable_width - logo_width - spacing
+    else:
+        available_width_for_title = usable_width
+        spacing = 0
+
+    # Wrap do título
+    title_w, title_h = title_paragraph.wrapOn(
+        canvas, available_width_for_title, 1 * inch
+    )
+
+    # Validação de dimensões
+    if not title_w or title_w <= 0:
+        title_w = available_width_for_title
+    if not title_h or title_h <= 0:
+        title_h = 0.3 * inch
+
+    # Calcula altura máxima do header
+    max_h = max(logo_height, title_h) if logo_img_obj else title_h
+
+    # Posição Y - CORRIGIDO: desenha DENTRO da margem superior
+    # O topo da página é page_height
+    # Queremos que o header fique logo abaixo do topo, ANTES do conteúdo
+    header_top_y = page_height - 0.3 * inch  # Começa 0.3" abaixo do topo
+    header_bottom_y = header_top_y - max_h  # Base do header
+
+    # Centraliza horizontalmente
+    if logo_img_obj:
+        total_content_width = logo_width + spacing + title_w
+    else:
+        total_content_width = title_w
+
+    start_x = doc.leftMargin + (usable_width - total_content_width) / 2.0
+    current_x = start_x
+
+    # Desenha Logo (alinhado na base com o título)
+    if logo_img_obj and logo_width > 0:
+        # Alinha pela base (bottom) em vez de centralizar verticalmente
+        logo_y = header_bottom_y
+        try:
+            logo_img_obj.drawOn(canvas, current_x, logo_y)
+            current_x += logo_width + spacing
+        except Exception as e:
+            print(f"✗ Erro ao desenhar logo: {e}")
+
+    # Desenha Título (alinhado na base com a logo)
+    title_y = header_bottom_y
+    try:
+        title_paragraph.drawOn(canvas, current_x, title_y)
+    except Exception as e:
+        print(f"✗ Erro ao desenhar título: {e}")
+
+    # Linha Separadora (logo abaixo do header)
+    line_y = header_bottom_y - 0.1 * inch
+    canvas.setStrokeColor(colors.HexColor("#C6E0B4"))
+    canvas.setLineWidth(0.8)
+    canvas.line(doc.leftMargin, line_y, page_width - doc.rightMargin, line_y)
+
+    canvas.restoreState()
+
+
+def _draw_footer(canvas, doc, gerado_por_usuario=None):
+    """Desenha o rodapé com legenda e info de geração."""
+    canvas.saveState()
+
+    page_width = landscape(letter)[0]
+    usable_width = page_width - doc.leftMargin - doc.rightMargin
+
+    # Legenda
     data = [
         ["LEGENDA", "F", "FOLGA", "HE", "HORA EXTRA", "FE", "FÉRIAS"],
-        ["", "AT", "ATESTADO", "AF", "ATESTADO INSS.", "LM", "LICENÇA MATERNIDADE"],
+        ["", "AT", "ATESTADO", "AF", "AFASTADO INSS.", "LM", "LICENÇA MATERNIDADE"],
     ]
     col_widths = [
         0.9 * inch,
@@ -175,66 +304,65 @@ def _draw_footer(canvas, doc):
         0.4 * inch,
         1.5 * inch,
     ]
+
     legend_table = Table(data, colWidths=col_widths)
-
-    style = TableStyle(
-        [
-            ("SPAN", (0, 0), (0, 1)),
-            ("GRID", (0, 0), (-1, -1), 1, colors.black),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ALIGN", (0, 0), (0, 1), "CENTER"),
-            ("FONTNAME", (0, 0), (0, 1), "Helvetica-Bold"),
-            ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
-            ("ALIGN", (1, 0), (1, 1), "CENTER"),
-            ("ALIGN", (3, 0), (3, 1), "CENTER"),
-            ("ALIGN", (5, 0), (5, 1), "CENTER"),
-            ("FONTNAME", (1, 0), (1, 0), "Helvetica-Bold"),
-            ("FONTNAME", (3, 0), (3, 0), "Helvetica-Bold"),
-            ("FONTNAME", (5, 0), (5, 0), "Helvetica-Bold"),
-            ("FONTNAME", (1, 1), (1, 1), "Helvetica-Bold"),
-            ("FONTNAME", (3, 1), (3, 1), "Helvetica-Bold"),
-            ("FONTNAME", (5, 1), (5, 1), "Helvetica-Bold"),
-            ("ALIGN", (2, 0), (2, 1), "LEFT"),
-            ("ALIGN", (4, 0), (4, 1), "LEFT"),
-            ("ALIGN", (6, 0), (6, 1), "LEFT"),
-            ("LEFTPADDING", (2, 0), (2, 1), 5),
-            ("LEFTPADDING", (4, 0), (4, 1), 5),
-            ("LEFTPADDING", (6, 0), (6, 1), 5),
-            ("BACKGROUND", (1, 0), (1, 0), colors.yellow),
-            ("BACKGROUND", (3, 0), (3, 0), colors.HexColor("#00B0F0")),
-            ("BACKGROUND", (5, 0), (5, 0), colors.HexColor("#ED7D31")),
-            ("BACKGROUND", (1, 1), (1, 1), colors.red),
-            ("BACKGROUND", (3, 1), (3, 1), colors.HexColor("#00B050")),
-            ("BACKGROUND", (5, 1), (5, 1), colors.HexColor("#7030A0")),
-        ]
+    legend_table.setStyle(
+        TableStyle(
+            [
+                ("SPAN", (0, 0), (0, 1)),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (0, 0), (0, 1), "CENTER"),
+                ("FONTNAME", (0, 0), (0, 1), "Helvetica-Bold"),
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 7),
+                ("ALIGN", (1, 0), (1, 1), "CENTER"),
+                ("ALIGN", (3, 0), (3, 1), "CENTER"),
+                ("ALIGN", (5, 0), (5, 1), "CENTER"),
+                ("FONTNAME", (1, 0), (1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (3, 0), (3, 0), "Helvetica-Bold"),
+                ("FONTNAME", (5, 0), (5, 0), "Helvetica-Bold"),
+                ("FONTNAME", (1, 1), (1, 1), "Helvetica-Bold"),
+                ("FONTNAME", (3, 1), (3, 1), "Helvetica-Bold"),
+                ("FONTNAME", (5, 1), (5, 1), "Helvetica-Bold"),
+                ("ALIGN", (2, 0), (2, 1), "LEFT"),
+                ("ALIGN", (4, 0), (4, 1), "LEFT"),
+                ("ALIGN", (6, 0), (6, 1), "LEFT"),
+                ("LEFTPADDING", (2, 0), (2, 1), 5),
+                ("LEFTPADDING", (4, 0), (4, 1), 5),
+                ("LEFTPADDING", (6, 0), (6, 1), 5),
+                ("BACKGROUND", (1, 0), (1, 0), colors.yellow),
+                ("BACKGROUND", (3, 0), (3, 0), colors.HexColor("#00B0F0")),
+                ("BACKGROUND", (5, 0), (5, 0), colors.HexColor("#ED7D31")),
+                ("BACKGROUND", (1, 1), (1, 1), colors.red),
+                ("BACKGROUND", (3, 1), (3, 1), colors.HexColor("#00B050")),
+                ("BACKGROUND", (5, 1), (5, 1), colors.HexColor("#7030A0")),
+            ]
+        )
     )
-    legend_table.setStyle(style)
 
-    # --- CORREÇÃO DO ALINHAMENTO DA LEGENDA ---
-    # Calcula a largura total da tabela da legenda
     legend_width = sum(col_widths)
-    # Calcula a largura útil da página
-    page_width = landscape(letter)[0]
-    usable_width = page_width - doc.leftMargin - doc.rightMargin
-    # Calcula a posição X inicial para centralizar a legenda
     start_x_legend = doc.leftMargin + (usable_width - legend_width) / 2.0
-
-    # Desenha a tabela da legenda na posição X calculada
     legend_table.wrapOn(canvas, doc.width, doc.bottomMargin)
-    # Usa start_x_legend em vez de doc.leftMargin
-    legend_table.drawOn(canvas, start_x_legend, 0.4 * inch)
-    # --- FIM DA CORREÇÃO ---
+    legend_table.drawOn(canvas, start_x_legend, 0.55 * inch)
 
-    # 2. Desenha o texto "Desenvolvido por" centralizado ENTRE as margens (como antes)
-    canvas.setFont("Helvetica", 8)
+    # Informações de Geração
+    canvas.setFont("Helvetica", 7)
+    canvas.setFillColor(colors.HexColor("#666666"))
+
     now = datetime.now()
     data_hora_geracao = now.strftime("%d/%m/%Y às %H:%M:%S")
-    texto_footer = f"Desenvolvido por NetCode | Impresso em: {data_hora_geracao}"
 
-    # O cálculo do centro para o texto já estava correto
-    center_x_text = doc.leftMargin + (usable_width / 2.0)
-    canvas.drawCentredString(center_x_text, 0.25 * inch, texto_footer)
+    # Esquerda: Desenvolvido por
+    canvas.drawString(doc.leftMargin, 0.3 * inch, "Desenvolvido por NetCode")
+
+    # Centro: Data/Hora
+    center_x = doc.leftMargin + (usable_width / 2.0)
+    canvas.drawCentredString(center_x, 0.3 * inch, f"Impresso em: {data_hora_geracao}")
+
+    # Direita: Usuário
+    texto_usuario = f"Gerado por: {gerado_por_usuario if gerado_por_usuario else 'Usuário Desconhecido'}"
+    canvas.drawRightString(page_width - doc.rightMargin, 0.3 * inch, texto_usuario)
 
     canvas.restoreState()
 
@@ -253,20 +381,49 @@ def _determinar_sequencia(info_colab):
     return 2
 
 
-def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="setor"):
+def exportar_para_pdf(
+    dados_escala,
+    ano,
+    mes,
+    caminho_arquivo,
+    ordenar_por="setor",
+    gerado_por_usuario=None,
+):
     """Gera múltiplas tabelas (uma por setor), com espaçamento,
     e garante que não quebrem entre páginas, colorindo afastamentos em blocos."""
 
+    # Busca a logo em múltiplos caminhos
+    possible_logo_paths = [
+        resource_path(os.path.join("src", "geradorEscalas", "assets", "logoPDF.png")),
+        os.path.join("src", "geradorEscalas", "assets", "logoPDF.png"),
+        os.path.join("assets", "logoPDF.png"),
+        os.path.join("geradorEscalas", "assets", "logoPDF.png"),
+        "logoPDF.png",
+    ]
+
+    logo_path = None
+    for path in possible_logo_paths:
+        if os.path.exists(path):
+            logo_path = path
+            print(f"✓ Logo encontrada: {path}")
+            break
+
+    if not logo_path:
+        print("⚠ Logo não encontrada - PDF será gerado sem logo")
+        print(f"  Diretório atual: {os.getcwd()}")
+
+    # Configurações
     if ordenar_por == "cargo":
         primary_group_key = "cargo"
         secondary_info_key = "setor"
         primary_group_label = "CARGO"
         secondary_column_header = "SETOR"
-    else:  # Padrão é 'setor'
+    else:
         primary_group_key = "setor"
         secondary_info_key = "cargo"
         primary_group_label = "SETOR"
         secondary_column_header = "CARGO"
+
     meses_nomes = [
         "JANEIRO",
         "FEVEREIRO",
@@ -296,6 +453,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
         "HORA EXTRA": "HE",
         "FOLGA": "F",
     }
+
     MOTIVO_COLORS = {
         "ATESTADO": colors.red,
         "AFASTADO INSS.": colors.HexColor("#00B050"),
@@ -311,18 +469,17 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
         "_DEFAULT_": colors.lightgrey,
     }
 
-    # Tamanho ideal do bloco (pode ajustar entre 4-7 dias)
     TAMANHO_BLOCO_IDEAL = 5
 
+    # Agrupa os dados
     grupos_primarios = {}
     for matricula, info in dados_escala.items():
         grupo_primario_val = info.get(
             primary_group_key, f"{primary_group_label} NÃO DEFINIDO"
         ).upper()
-
         escala_tipo = info.get("escala", "N/A").upper()
         tipo_turno_bruto = info.get("Tipo_turno", "")
-        escala_nome_grupo = ""
+
         if tipo_turno_bruto:
             tipo_turno_limpo = tipo_turno_bruto.split(" ")[0].upper()
             escala_nome_grupo = f"{escala_tipo} - {tipo_turno_limpo}"
@@ -337,26 +494,19 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
             (matricula, info)
         )
 
+    # Configuração do documento - margem superior ajustada para logo maior
     doc = SimpleDocTemplate(
         caminho_arquivo,
         pagesize=landscape(letter),
-        topMargin=0.7 * inch,
-        bottomMargin=1.0 * inch,
+        topMargin=1.6 * inch,  # Aumentada para acomodar logo maior (1.2" + espaços)
+        bottomMargin=1.2 * inch,
         leftMargin=0.5 * inch,
         rightMargin=0.5 * inch,
     )
     elementos = []
 
+    # Estilos
     styles = getSampleStyleSheet()
-    style_titulo = ParagraphStyle(
-        "CustomTitle",
-        parent=styles["Heading1"],
-        fontSize=14,
-        textColor=colors.black,
-        spaceAfter=8,
-        alignment=TA_CENTER,
-        fontName="Helvetica-Bold",
-    )
     style_setor_row = ParagraphStyle(
         "SetorTitle",
         parent=styles["Normal"],
@@ -380,10 +530,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
         "CellWrapCenter", fontSize=7, fontName="Helvetica", alignment=TA_CENTER
     )
 
-    titulo_html = f'ESCALA <font color="red">UMPA STA. LUZIA</font> - {mes_nome} {ano}'
-    elementos.append(Paragraph(titulo_html, style_titulo))
-    elementos.append(Spacer(1, 0.1 * inch))
-
+    # Cabeçalhos das tabelas
     cabecalho_dias = ["NOME", secondary_column_header, "MATRÍCULA", "CONSELHO"] + [
         str(i) for i in range(1, num_dias + 1)
     ]
@@ -392,8 +539,9 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
         dia_semana_num = weekday(ano, mes, dia_num)
         cabecalho_semana.append(dias_semana_abrev[dia_semana_num])
 
+    # Larguras das colunas
     largura_col_nome = 2.0 * inch
-    largura_secondary_col = 1.2 * inch  # Largura da coluna que muda (Cargo/Setor)
+    largura_secondary_col = 1.2 * inch
     largura_matricula = 0.7 * inch
     largura_conselho = 0.7 * inch
     largura_disponivel = (
@@ -413,6 +561,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
     ] + ([largura_col_dia] * num_dias)
     colunas_totais = len(larguras_colunas)
 
+    # Estilos base da tabela
     estilos_base = [
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#C6E0B4")),
         ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
@@ -433,6 +582,7 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
         ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
         ("LINEBELOW", (0, 1), (-1, 1), 1, colors.black),
     ]
+
     estilos_fds_cabecalho = []
     for dia_num in range(1, num_dias + 1):
         if weekday(ano, mes, dia_num) >= 5:
@@ -446,8 +596,8 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
                 )
             )
 
+    # Constrói as tabelas (mantém o resto do código original)
     for grupo_primario_nome, escalas_do_grupo in sorted(grupos_primarios.items()):
-
         dados_para_esta_tabela = [cabecalho_dias, cabecalho_semana]
         estilos_para_esta_tabela = list(estilos_base) + list(estilos_fds_cabecalho)
         row_index = 2
@@ -455,7 +605,6 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
         for i, (escala_nome_grupo, colaboradores_do_grupo) in enumerate(
             sorted(escalas_do_grupo.items())
         ):
-
             titulo_setor_cell = ""
             if i == 0:
                 titulo_setor_cell = Paragraph(grupo_primario_nome, style_setor_row)
@@ -528,7 +677,6 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
                         motivo_upper, motivo_upper[:2].upper()
                     )
 
-                # Determina quais dias estão em afastamento
                 dias_afastamento = set()
                 if (
                     afastamento_inicio
@@ -545,21 +693,16 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
                     ):
                         data_inicio_no_mes = max(afastamento_inicio, primeiro_dia_mes)
                         data_fim_no_mes = min(afastamento_fim, ultimo_dia_mes)
-
                         for dia_num in range(
                             data_inicio_no_mes.day, data_fim_no_mes.day + 1
                         ):
                             dias_afastamento.add(dia_num)
 
-                # Preenche as células dos dias
                 for dia_num in range(1, num_dias + 1):
                     valor_celula_str = ""
-
                     if dia_num in dias_afastamento:
-                        # Célula vazia - será preenchida pelo SPAN
                         valor_celula_str = ""
                     else:
-                        # Lógica normal de trabalho/folga
                         try:
                             data_do_dia = date(ano, mes, dia_num)
                             if not escala_data_base or data_do_dia >= escala_data_base:
@@ -568,12 +711,10 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
                                     valor_celula_str = "X"
                         except ValueError:
                             valor_celula_str = ""
-
                     linha_colab.append(valor_celula_str)
 
                 dados_para_esta_tabela.append(linha_colab)
 
-                # Estilos da Linha
                 cor_fundo_zebra = (
                     colors.HexColor("#F2F2F2") if is_even_row else colors.white
                 )
@@ -587,17 +728,12 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
                     ("BOTTOMPADDING", (0, row_index), (-1, row_index), 3)
                 )
 
-                # Cria blocos de afastamento
                 if dias_afastamento and cor_afastamento:
                     dias_ordenados = sorted(dias_afastamento)
-
                     i = 0
                     while i < len(dias_ordenados):
-                        # Calcula tamanho do bloco
                         dias_restantes = len(dias_ordenados) - i
                         tamanho_bloco = min(TAMANHO_BLOCO_IDEAL, dias_restantes)
-
-                        # Se sobrar muito pouco, ajusta
                         if (
                             dias_restantes - tamanho_bloco > 0
                             and dias_restantes - tamanho_bloco < 3
@@ -606,11 +742,9 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
 
                         primeiro_dia_bloco = dias_ordenados[i]
                         ultimo_dia_bloco = dias_ordenados[i + tamanho_bloco - 1]
-
                         start_col = primeiro_dia_bloco + 3
                         end_col = ultimo_dia_bloco + 3
 
-                        # Aplica SPAN e estilos
                         estilos_para_esta_tabela.append(
                             ("SPAN", (start_col, row_index), (end_col, row_index))
                         )
@@ -647,7 +781,6 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
                             )
                         )
 
-                        # Cor do texto
                         if cor_afastamento in [colors.red, colors.HexColor("#7030A0")]:
                             estilos_para_esta_tabela.append(
                                 (
@@ -658,12 +791,9 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
                                 )
                             )
 
-                        # Coloca o texto da abreviação na primeira célula do bloco
                         linha_colab[start_col] = motivo_abbrev
-
                         i += tamanho_bloco
 
-                # Colore Fim de Semana (apenas células não afastadas)
                 for dia_num in range(1, num_dias + 1):
                     if (
                         weekday(ano, mes, dia_num) >= 5
@@ -682,13 +812,20 @@ def exportar_para_pdf(dados_escala, ano, mes, caminho_arquivo, ordenar_por="seto
                 is_even_row = not is_even_row
                 row_index += 1
 
-        tabela_grupo_primario = Table(dados_para_esta_tabela, colWidths=larguras_colunas)
+        tabela_grupo_primario = Table(
+            dados_para_esta_tabela, colWidths=larguras_colunas
+        )
         tabela_grupo_primario.setStyle(TableStyle(estilos_para_esta_tabela))
-
-        bloco_para_manter_junto = [
-            tabela_grupo_primario,
-            Spacer(1, 0.2 * inch)
-        ]
+        bloco_para_manter_junto = [tabela_grupo_primario, Spacer(1, 0.2 * inch)]
         elementos.append(KeepTogether(bloco_para_manter_junto))
 
-    doc.build(elementos, onFirstPage=_draw_footer, onLaterPages=_draw_footer)
+    # Função de template para header e footer
+    def draw_page_template(canvas, doc):
+        _draw_header(canvas, doc, mes_nome, ano, logo_path)
+        _draw_footer(canvas, doc, gerado_por_usuario)
+
+    # Constrói o documento
+    doc.build(
+        elementos, onFirstPage=draw_page_template, onLaterPages=draw_page_template
+    )
+    print(f"✓ PDF gerado com sucesso: {caminho_arquivo}")

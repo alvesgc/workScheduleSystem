@@ -1089,10 +1089,20 @@ class GeradorEscalaView(ctk.CTkFrame):
             if not caminho_arquivo:
                 return
 
+            usuario_logado = "Usuário Desconhecido" # Valor padrão
+            try:
+                if hasattr(self.app_controller, 'get_user_by_username'):
+                     user_info = self.app_controller.get_user_by_username()
+                     if user_info:
+                         usuario_logado = user_info
+            except Exception as e:
+                print(f"Aviso: Não foi possível obter o nome do usuário logado: {e}")
+            
             try:
                 exporters.exportar_para_pdf(
                     self.ultima_escala_gerada, ano, mes, caminho_arquivo,
-                    ordenar_por=ordenacao
+                    ordenar_por=ordenacao,
+                    gerado_por_usuario=usuario_logado
                 )
                 messagebox.showinfo("Sucesso", f"PDF exportado com sucesso para:\n{caminho_arquivo}", parent=self)
                 try:
