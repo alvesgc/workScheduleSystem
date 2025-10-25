@@ -1018,6 +1018,14 @@ class GeradorEscalaView(ctk.CTkFrame):
             messagebox.showwarning("Aviso", "Gere uma prévia da escala antes de exportar.", parent=self)
             return
 
+        try:
+            ano = int(self.ano_var.get())
+            mes_str = self.mes_var.get()
+            mes_nome_arquivo = mes_str.lower()
+            mes = list(self.meses_map.keys()).index(mes_str) + 1
+        except (ValueError, AttributeError, IndexError):
+            messagebox.showerror("Erro", "Não foi possível obter o mês e ano selecionados.", parent=self)
+            return
         # --- Calcula a posição do pop-up com verificação de limites ---
         self.update_idletasks() # Garante coordenadas atualizadas
 
@@ -1066,7 +1074,14 @@ class GeradorEscalaView(ctk.CTkFrame):
 
         ordenacao = dialog.ordenacao_escolhida
         if ordenacao:
+            # --- Cria o nome do arquivo sugerido ---
+            default_filename = f"escala_{mes_nome_arquivo}_{ano}.pdf"
+            # --- Fim da criação do nome ---
+
             caminho_arquivo = filedialog.asksaveasfilename(
+                # --- Adiciona initialfile ---
+                initialfile=default_filename,
+                # --- Fim da adição ---
                 defaultextension=".pdf",
                 filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
                 title="Salvar PDF da Escala",
@@ -1075,30 +1090,17 @@ class GeradorEscalaView(ctk.CTkFrame):
                 return
 
             try:
-                ano = int(self.ano_var.get())
-                mes_str = self.mes_var.get()
-                mes = list(self.meses_map.keys()).index(mes_str) + 1
-            except (ValueError, AttributeError, IndexError):
-                messagebox.showerror("Erro", "Não foi possível obter o mês e ano selecionados.", parent=self)
-                return
-
-            try:
                 exporters.exportar_para_pdf(
                     self.ultima_escala_gerada, ano, mes, caminho_arquivo,
                     ordenar_por=ordenacao
                 )
                 messagebox.showinfo("Sucesso", f"PDF exportado com sucesso para:\n{caminho_arquivo}", parent=self)
-
                 try:
                     diretorio = os.path.dirname(caminho_arquivo)
-                    if sys.platform == "win32":
-                        os.startfile(diretorio)
-                    elif sys.platform == "darwin":
-                        subprocess.Popen(["open", diretorio])
-                    else:
-                        subprocess.Popen(["xdg-open", diretorio])
+                    if sys.platform == "win32": os.startfile(diretorio)
+                    elif sys.platform == "darwin": subprocess.Popen(["open", diretorio])
+                    else: subprocess.Popen(["xdg-open", diretorio])
                 except Exception as open_err:
                     print(f"Não foi possível abrir a pasta do arquivo automaticamente: {open_err}")
-
             except Exception as e:
                 messagebox.showerror("Erro na Exportação", f"Ocorreu um erro ao gerar o PDF:\n{e}", parent=self)
