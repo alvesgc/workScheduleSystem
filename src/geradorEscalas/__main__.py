@@ -21,6 +21,7 @@ from .ui.views import (
 )
 from . import database as db
 from . import fonts
+import unicodedata
 
 # --- CONFIGURAÇÕES GLOBAIS ---
 ctk.set_appearance_mode("light")
@@ -88,6 +89,30 @@ def run_import_colaboradores(parent_window):
 
 def run_save_colaborador(dados_colaborador):
     pass
+
+
+def normalize_column_name(col_name):
+    if not isinstance(col_name, str):
+        return str(col_name).lower()
+
+    col_normalized = unicodedata.normalize("NFD", col_name)
+    col_normalized = "".join(
+        char for char in col_normalized if unicodedata.category(char) != "Mn"
+    )
+    col_normalized = col_normalized.lower().strip()
+    col_normalized = col_normalized.replace(" ", "_")
+
+    return col_normalized
+
+
+def find_column_in_dataframe(df, target_column):
+    target_normalized = normalize_column_name(target_column)
+
+    for col in df.columns:
+        if normalize_column_name(col) == target_normalized:
+            return col
+
+    return None
 
 
 APP_VERSION = "1.0.0"
@@ -316,10 +341,6 @@ class App(ctk.CTk):
             )
 
     def on_import_colaboradores(self):
-        """
-        Lida com a importação, validação, salva os registros válidos
-        e move os inválidos para a tela de gerenciamento para correção.
-        """
         filepath = filedialog.askopenfilename(
             title="Selecione a planilha com os colaboradores",
             filetypes=[("Arquivos Excel", "*.xlsx")],
@@ -327,156 +348,166 @@ class App(ctk.CTk):
         if not filepath:
             return
 
-        # Colunas obrigatórias no arquivo Excel
-        required_file_columns = [
-            "Nome",
-            "Matrícula",
-            # "Cargo",
-            # "Setor",
-            # "Escala",
-            # "Tipo de Turno",
-        ]
-        # Colunas obrigatórias para um registro ser considerado válido no BD
-        required_db_fields = ["Nome", "Matrícula"]
+        column_mapping = {
+            "nome": "nome",
+            "matricula": "matricula",
+            "cargo": "cargo",
+            "setor": "setor",
+            "escala": "escala",
+            "tipo_de_turno": "tipo_turno",
+        }
+
+        required_columns_normalized = ["nome", "matricula"]
 
         try:
-            # Força as colunas esperadas a serem lidas como texto (string)
-            tipos_de_dados = {
-                "Nome": str,
-                "Matrícula": str,
-                # "Cargo": str,
-                # "Setor": str,
-                # "Escala": str,
-                # "Tipo de Turno": str,
-            }
-            df = pd.read_excel(filepath, dtype=tipos_de_dados)
-            # Limpa os valores nulos do Pandas para None do Python
+            df = pd.read_excel(filepath)
             df = df.replace({np.nan: None})
 
-            # 1. Validação Estrutural (Verifica se as colunas existem no arquivo)
-            missing_cols = [
-                col for col in required_file_columns if col not in df.columns
+            found_columns = {}
+
+            for normalized_col in column_mapping.keys():
+                original_col = find_column_in_dataframe(df, normalized_col)
+                if original_col:
+                    found_columns[normalized_col] = original_col
+
+            missing_required = [
+                col for col in required_columns_normalized if col not in found_columns
             ]
-            if missing_cols:
+
+            if missing_required:
+                friendly_names = {"nome": "Nome", "matricula": "Matrícula"}
+                missing_friendly = [
+                    friendly_names.get(col, col.title()) for col in missing_required
+                ]
+
                 messagebox.showerror(
                     "Erro de Importação",
-                    f"A planilha não pode ser importada.\nColunas obrigatórias faltando:\n\n- {', '.join(missing_cols)}",
+                    f"A planilha não pode ser importada.\n\n"
+                    f"Colunas obrigatórias não encontradas:\n"
+                    f"• {', '.join(missing_friendly)}\n\n"
+                    f"Colunas disponíveis na planilha:\n"
+                    f"• {', '.join(df.columns.tolist())}",
                     parent=self,
                 )
                 return
 
+            print(f"✓ Colunas encontradas e mapeadas:")
+            for norm_col, orig_col in found_columns.items():
+                print(f"  '{orig_col}' -> '{column_mapping[norm_col]}'")
+
             valid_rows = []
             invalid_rows = []
 
-            # Mapeamento de colunas do Excel para o formato do banco de dados
-            column_mapping = {
-                "Nome": "nome",
-                "Matrícula": "matricula",
-                "Cargo": "cargo",
-                "Setor": "setor",
-                "Escala": "escala",
-                "Tipo de Turno": "tipo_turno",
-            }
-
-            # 2. Separa as linhas em válidas e inválidas
             for index, row in df.iterrows():
-                # Converte a linha para dicionário com nomes padronizados
                 row_dict = {}
-                
-                # Processa cada coluna obrigatória
-                for col_excel, col_db in column_mapping.items():
-                    value = row.get(col_excel)
-                    # Limpa o valor se for string
-                    if isinstance(value, str):
-                        value = value.strip()
-                        # Converte string vazia para None
-                        if value == "" or value.lower() == "none":
+
+                for normalized_col, db_col in column_mapping.items():
+                    original_col = found_columns.get(normalized_col)
+
+                    if original_col:
+                        value = row.get(original_col)
+
+                        if isinstance(value, str):
+                            value = value.strip()
+                            if value == "" or value.lower() == "none":
+                                value = None
+                        elif pd.isna(value):
                             value = None
-                    # Se for NaN ou None, converte para None
-                    elif pd.isna(value):
-                        value = None
-                    
-                    # Usa o nome da coluna do banco de dados
-                    row_dict[col_db] = value
-                
-                # Verifica se os campos obrigatórios têm conteúdo válido
-                # Usa os nomes padronizados do banco (minúsculas)
-                required_db_fields_normalized = ["nome", "matricula"]
+
+                        row_dict[db_col] = value
+                    else:
+                        row_dict[db_col] = None
+
+                required_db_fields = ["nome", "matricula"]
                 is_valid = all(
-                    row_dict.get(col) is not None and row_dict.get(col) != ""
-                    for col in required_db_fields_normalized
+                    row_dict.get(col) is not None
+                    and str(row_dict.get(col)).strip() != ""
+                    for col in required_db_fields
                 )
-                
+
                 if is_valid:
                     valid_rows.append(row_dict)
                 else:
-                    # Identifica quais campos estão faltando (usando nomes legíveis)
                     missing_fields = []
-                    if not row_dict.get("nome"):
+                    if (
+                        not row_dict.get("nome")
+                        or str(row_dict.get("nome")).strip() == ""
+                    ):
                         missing_fields.append("Nome")
-                    if not row_dict.get("matricula"):
+                    if (
+                        not row_dict.get("matricula")
+                        or str(row_dict.get("matricula")).strip() == ""
+                    ):
                         missing_fields.append("Matrícula")
-                    
-                    row_dict["_observacao"] = f"Campos obrigatórios faltando: {', '.join(missing_fields)}"
+
+                    row_dict["_observacao"] = (
+                        f"Campos obrigatórios faltando: {', '.join(missing_fields)}"
+                    )
                     invalid_rows.append(row_dict)
 
-            # 3. Insere as linhas válidas no banco de dados
             sucesso, falhas = 0, 0
+            duplicados = []
+
             for row_data in valid_rows:
-                is_success, _ = db.add_colaborador(row_data)
+                is_success, msg = db.add_colaborador(row_data)
                 if is_success:
                     sucesso += 1
                 else:
                     falhas += 1
+                    if "já existe" in msg.lower() or "duplicad" in msg.lower():
+                        row_data["_observacao"] = f"Matrícula duplicada: {msg}"
+                        duplicados.append(row_data)
 
-            # 4. Prepara a mensagem de resumo
+            invalid_rows.extend(duplicados)
+
             total_processados = len(valid_rows) + len(invalid_rows)
             info_parts = []
-            
+
             if sucesso > 0:
-                info_parts.append(f"✓ {sucesso} colaborador(es) importado(s) com sucesso")
-            
+                info_parts.append(
+                    f"✓ {sucesso} colaborador(es) importado(s) com sucesso"
+                )
+
             if falhas > 0:
-                info_parts.append(f"✗ {falhas} falharam (ex: matrículas duplicadas)")
-            
+                info_parts.append(f"✗ {falhas} falharam ao salvar")
+
             if len(invalid_rows) > 0:
                 info_parts.append(
-                    f"⚠ {len(invalid_rows)} registro(s) com dados incompletos "
+                    f"⚠ {len(invalid_rows)} registro(s) com problemas "
                     f"foram carregados para revisão"
                 )
-            
+
             info_message = "\n".join(info_parts)
 
-            # 5. Decide o fluxo baseado nos resultados
             if len(invalid_rows) > 0:
-                # Há registros inválidos - navega para tela de correção
                 messagebox.showinfo(
-                    "Importação Parcial", 
+                    "Importação Parcial",
                     info_message + "\n\nRevise e complete os dados na próxima tela.",
-                    parent=self
+                    parent=self,
                 )
-                
-                # Navega para a tela de colaboradores com os registros inválidos
+
                 if isinstance(self.current_view, MainView):
                     self.current_view.show_colaboradores_view(invalid_rows=invalid_rows)
             else:
-                # Tudo foi importado com sucesso
                 if sucesso > 0:
-                    messagebox.showinfo("Importação Concluída", info_message, parent=self)
-                
-                # Atualiza a tela com todos os dados do banco
+                    messagebox.showinfo(
+                        "Importação Concluída", info_message, parent=self
+                    )
+
                 if isinstance(self.current_view, MainView):
                     self.current_view.show_colaboradores_view()
 
         except Exception as e:
             import traceback
+
             error_details = traceback.format_exc()
             print(f"ERRO na importação:\n{error_details}")
             messagebox.showerror(
-                "Erro", 
-                f"Ocorreu um erro ao processar a planilha:\n\n{str(e)}", 
-                parent=self
+                "Erro",
+                f"Ocorreu um erro ao processar a planilha:\n\n{str(e)}",
+                parent=self,
             )
+
     def on_delete_collaborators(self, matriculas):
         """Deleta múltiplos colaboradores e atualiza a tabela."""
         success, message = db.delete_collaborators_by_matriculas(matriculas)

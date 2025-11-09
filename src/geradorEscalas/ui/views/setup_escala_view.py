@@ -1,6 +1,8 @@
 import customtkinter as ctk
 from datetime import datetime
 from tkinter import messagebox
+
+from ...utils import resource_path
 from ... import fonts
 from ..widgets.ctk_calendar import CTkCalendar
 import tkfontawesome as fa
@@ -54,7 +56,7 @@ class SetupEscalaView(ctk.CTkToplevel):
         self.img_checked = None
         self.img_unchecked = None
         try:
-            icon_path = "src/geradorEscalas/assets/icons"
+            icon_path = resource_path(os.path.join("src", "geradorEscalas", "assets","icons"))
             pil_checked = Image.open(
                 os.path.join(icon_path, "checkbox_checked.png")
             ).resize((16, 16), Image.Resampling.LANCZOS)

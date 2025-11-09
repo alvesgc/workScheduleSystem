@@ -9,7 +9,7 @@ import os
 import tkfontawesome as fa
 from ..widgets.CTkAdvancedTable import CTkAdvancedTable
 from .quick_edit_dialog_view import QuickEditDialog
-
+from ...utils import resource_path
 class GerenciarColaboradoresView(ctk.CTkFrame):
     def __init__(self, master, app_controller, data_to_load=None):
         super().__init__(master, fg_color="#F5F6FA")
@@ -36,7 +36,7 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
 
         # --- Carregar Imagens dos Checkboxes ---
         try:
-            icon_path = "src/geradorEscalas/assets/icons"
+            icon_path = resource_path(os.path.join("src", "geradorEscalas", "assets","icons"))
             pil_checked = Image.open(
                 os.path.join(icon_path, "checkbox_checked.png")
             ).resize((16, 16), Image.Resampling.LANCZOS)
@@ -349,9 +349,19 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
                     iid = base_iid
 
             used_iids.add(iid)
-
             row_tag = "evenrow" if i % 2 == 0 else "oddrow"
-            valores = [record.get(col, "") for col in colunas_df]
+            
+            # valores = (
+            #     str(record.get("nome", "")).strip(),
+            #     str(record.get("matricula", "")).strip(),
+            #     str(record.get("cargo", "")).strip(),
+            #     str(record.get("setor", "")).strip(),
+            #     str(record.get("tipo_turno", "")).strip(),
+            #     str(record.get("escala", "")).strip(),
+            # )
+        
+            # Se colunas_df contém as colunas corretas, use assim:
+            valores = tuple(str(record.get(col, "")).strip() for col in colunas_df)
 
             try:
                 self.tree.insert(
@@ -362,8 +372,13 @@ class GerenciarColaboradoresView(ctk.CTkFrame):
                     values=valores,
                     tags=(row_tag,),
                 )
+                print(f"✓ Linha {i} inserida com sucesso")
+                
             except Exception as e:
                 print(f"ERRO ao inserir linha {i} com iid '{iid}': {e}")
+                print(f"  Valores problemáticos: {valores}")
+                print(f"  Record: {record}")
+                
                 # Tenta com ID alternativo em caso de erro
                 alternative_iid = f"row_{i}_{hash(str(record))}"
                 try:

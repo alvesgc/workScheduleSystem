@@ -160,7 +160,6 @@ try:
 
             with temp_engine.connect() as connection:
                 trans = connection.begin()
-                # --- Definição das Tabelas (SEU CÓDIGO AQUI - NENHUMA MUDANÇA) ---
                 tabela_usuarios = """
                 CREATE TABLE IF NOT EXISTS usuarios (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -231,8 +230,6 @@ except (FileNotFoundError, ConnectionError, ValueError) as e:
     print(f"-------------------------------------------------------------")
     print(f" Detalhes: {e}")
     print(f"-------------------------------------------------------------")
-    # Em uma aplicação real, aqui você mostraria um messagebox.showerror
-    # e talvez fechasse a aplicação ou desabilitaria funcionalidades.
     DB_CONFIG = None  # Garante que DB_CONFIG é None se falhar
     engine = None  # Garante que engine é None se falhar
 
@@ -243,10 +240,38 @@ def get_user_by_username(username):
         return None
 
     with engine.connect() as connection:
-        query = text("SELECT *, foto_path FROM usuarios WHERE username = :user")
+        query = text("SELECT * FROM usuarios WHERE username = :user")
         result = connection.execute(query, {"user": username}).fetchone()
         return result._asdict() if result else None
 
+def get_current_user_name(self):
+    """Retorna o nome do usuário atualmente logado."""
+    print(f"DEBUG get_current_user_name: Iniciando...")
+    print(f"DEBUG: Tem username? {hasattr(self, 'username')}")
+    
+    if hasattr(self, 'username'):
+        print(f"DEBUG: self.username = {self.username}")
+    
+    try:
+        if hasattr(self, 'username') and self.username:
+            print(f"DEBUG: Buscando usuário '{self.username}' no banco...")
+            user_info = self.get_user_by_username(self.username)
+            print(f"DEBUG: user_info retornado: {user_info}")
+            
+            if user_info:
+                nome = user_info.get('nome_completo', user_info.get('username', 'Usuário Desconhecido'))
+                print(f"DEBUG: Nome extraído: {nome}")
+                return nome
+            else:
+                print("DEBUG: user_info é None ou vazio")
+        else:
+            print("DEBUG: self.username não existe ou está vazio")
+    except Exception as e:
+        print(f"ERRO em get_current_user_name: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return "Usuário Desconhecido"
 
 def add_user(username, password, role, photo_path=None):
     """Adiciona um novo usuário ao banco de dados com senha criptografada."""

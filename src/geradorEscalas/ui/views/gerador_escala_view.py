@@ -16,15 +16,16 @@ from ... import database as db
 from .setup_escala_view import SetupEscalaView
 from ..widgets.CTkAdvancedTable import CTkAdvancedTable
 from .orderar_pdf_view import OrdenacaoPdfDialog
-
+from ...utils import resource_path
 ChecklistDropdown = checklist.ChecklistDropdown
 
 
 class GeradorEscalaView(ctk.CTkFrame):
-    def __init__(self, master, app_controller):
+    def __init__(self, master, app_controller, username_logado=None):
         super().__init__(master, fg_color="#F5F6FA")
         self.app_controller = app_controller
         self.ultima_escala_gerada = None
+        self.username_logado = username_logado
         self.selected_matriculas = set()
         # === PALETA DE CORES HIERÁRQUICA ===
         PRIMARY = "#0078D7"
@@ -49,9 +50,9 @@ class GeradorEscalaView(ctk.CTkFrame):
         SUCCESS_HOVER = "#059669"
 
         try:
-            icon_path = "src/geradorEscalas/assets/icons"
+            icon_path = resource_path(os.path.join("src", "geradorEscalas", "assets","icons"))
             pil_checked = Image.open(
-                os.path.join(icon_path, "checkbox_checked.png") 
+                os.path.join(icon_path, "checkbox_checked.png")
             ).resize((16, 16), Image.Resampling.LANCZOS)
             pil_unchecked = Image.open(
                 os.path.join(icon_path, "checkbox_unchecked.png")
@@ -59,9 +60,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             self.img_checked = ImageTk.PhotoImage(pil_checked)
             self.img_unchecked = ImageTk.PhotoImage(pil_unchecked)
         except Exception as e:
-            print(
-                f"ERRO: Não foi possível carregar as imagens de checkbox: {e}"
-            )  
+            print(f"ERRO: Não foi possível carregar as imagens de checkbox: {e}")
             self.img_checked = self.img_unchecked = None
 
         # --- Carrega os dados para os filtros ---
@@ -623,61 +622,77 @@ class GeradorEscalaView(ctk.CTkFrame):
         # --- CORREÇÃO: Container principal modificado ---
         # O container agora ocupa quase toda a janela e inclui o título
         container = ctk.CTkFrame(
-            popup, fg_color=SURFACE, border_color=BORDER,
-            border_width=1, corner_radius=12
+            popup,
+            fg_color=SURFACE,
+            border_color=BORDER,
+            border_width=1,
+            corner_radius=12,
         )
         # Ajustado pady para começar mais perto do topo
         container.pack(fill="both", expand=True, padx=20, pady=(20, 10))
         # --- FIM DA CORREÇÃO ---
 
-
         # --- CORREÇÃO: Título movido para DENTRO do container ---
         # Removido o 'header' frame
         ctk.CTkLabel(
-            container, # Master agora é o container principal
+            container,  # Master agora é o container principal
             text="Legenda da Escala",
             font=fonts.TITULO_SECAO,
             text_color=TEXT_PRIMARY,
-        ).pack(anchor="w", padx=15, pady=(10, 5)) # Adicionado padx e ajustado pady
+        ).pack(
+            anchor="w", padx=15, pady=(10, 5)
+        )  # Adicionado padx e ajustado pady
         # --- FIM DA CORREÇÃO ---
-
 
         # Scroll Frame (agora dentro do container, abaixo do título)
         scroll_frame = ctk.CTkScrollableFrame(
-            container, fg_color=SURFACE, corner_radius=12,
-            border_width=0 # Remove borda interna se houver
+            container,
+            fg_color=SURFACE,
+            corner_radius=12,
+            border_width=0,  # Remove borda interna se houver
         )
         # Ajustado pady para ficar mais próximo do título
         scroll_frame.pack(fill="both", expand=True, padx=10, pady=(5, 10))
 
         # --- DADOS DA LEGENDA ---
         categorias = [
-            ("SÍMBOLOS BÁSICOS", [
-                ("X", "Dia de Trabalho", SUCCESS),
-                ("F", "Folga / Descanso", TEXT_SECONDARY),
-            ]),
-            ("AFASTAMENTOS", [
-                ("AT", "Atestado Médico", DANGER),
-                ("AF", "Afastado INSS", SUCCESS),
-                ("FE", "Férias", WARNING),
-                ("LM", "Licença Maternidade", INFO),
-            ]),
-            ("MARCADORES DE CABEÇALHO", [
-                ("•Dia•", "Final de Semana", TEXT_SECONDARY),
-                ("[Dia]", "Dia Atual", PRIMARY),
-            ])
+            (
+                "SÍMBOLOS BÁSICOS",
+                [
+                    ("X", "Dia de Trabalho", SUCCESS),
+                    ("F", "Folga / Descanso", TEXT_SECONDARY),
+                ],
+            ),
+            (
+                "AFASTAMENTOS",
+                [
+                    ("AT", "Atestado Médico", DANGER),
+                    ("AF", "Afastado INSS", SUCCESS),
+                    ("FE", "Férias", WARNING),
+                    ("LM", "Licença Maternidade", INFO),
+                ],
+            ),
+            (
+                "MARCADORES DE CABEÇALHO",
+                [
+                    ("•Dia•", "Final de Semana", TEXT_SECONDARY),
+                    ("[Dia]", "Dia Atual", PRIMARY),
+                ],
+            ),
         ]
 
         # --- Lógica de Layout (com linha separadora) ---
         for titulo, itens in categorias:
             ctk.CTkLabel(
-                scroll_frame, text=titulo, font=fonts.SUBTITULO,
+                scroll_frame,
+                text=titulo,
+                font=fonts.SUBTITULO,
                 text_color=TEXT_PRIMARY,
             ).pack(anchor="w", pady=(15, 2), padx=5)
 
-            ctk.CTkFrame(
-                scroll_frame, height=1, fg_color=BORDER, corner_radius=0
-            ).pack(fill="x", padx=5, pady=(0, 5))
+            ctk.CTkFrame(scroll_frame, height=1, fg_color=BORDER, corner_radius=0).pack(
+                fill="x", padx=5, pady=(0, 5)
+            )
 
             for sigla, desc, cor in itens:
                 linha = ctk.CTkFrame(scroll_frame, fg_color="transparent")
@@ -686,23 +701,39 @@ class GeradorEscalaView(ctk.CTkFrame):
                 linha.grid_columnconfigure(1, weight=1)
 
                 sigla_label = ctk.CTkLabel(
-                    linha, text=sigla, width=60,
-                    font=fonts.TEXTO_NORMAL if sigla not in ["•Dia•", "[Dia]"] else fonts.TEXTO_NORMAL,
-                    text_color=cor, anchor="w"
+                    linha,
+                    text=sigla,
+                    width=60,
+                    font=(
+                        fonts.TEXTO_NORMAL
+                        if sigla not in ["•Dia•", "[Dia]"]
+                        else fonts.TEXTO_NORMAL
+                    ),
+                    text_color=cor,
+                    anchor="w",
                 )
                 sigla_label.grid(row=0, column=0, sticky="w", padx=(0, 10))
 
                 desc_label = ctk.CTkLabel(
-                    linha, text=desc, font=fonts.TEXTO_NORMAL,
-                    text_color=TEXT_SECONDARY, anchor="w", wraplength=300
+                    linha,
+                    text=desc,
+                    font=fonts.TEXTO_NORMAL,
+                    text_color=TEXT_SECONDARY,
+                    anchor="w",
+                    wraplength=300,
                 )
                 desc_label.grid(row=0, column=1, sticky="w")
         # --- FIM DA LÓGICA ---
 
         # Botão Entendi
         ctk.CTkButton(
-            popup, text="Entendi", fg_color=PRIMARY, hover_color="#005EA6",
-            font=fonts.BUTTON_FONT, corner_radius=8, height=42,
+            popup,
+            text="Entendi",
+            fg_color=PRIMARY,
+            hover_color="#005EA6",
+            font=fonts.BUTTON_FONT,
+            corner_radius=8,
+            height=42,
             command=popup.destroy,
         ).pack(pady=(5, 15))
 
@@ -982,7 +1013,7 @@ class GeradorEscalaView(ctk.CTkFrame):
 
     def get_selected_matriculas(self):
         """Retorna lista de matrículas selecionadas."""
-        return list(self.selected_matriculas)  
+        return list(self.selected_matriculas)
 
     def update_context_buttons(self):
         """Habilita/desabilita botões baseado na seleção."""
@@ -998,24 +1029,25 @@ class GeradorEscalaView(ctk.CTkFrame):
         # Alterna a seleção
         if item_id in self.selected_matriculas:
             self.selected_matriculas.remove(item_id)
-            self.tree.item(item_id, image=self.img_unchecked) 
+            self.tree.item(item_id, image=self.img_unchecked)
         else:
             self.selected_matriculas.add(item_id)
-            self.tree.item(item_id, image=self.img_checked) 
-
+            self.tree.item(item_id, image=self.img_checked)
 
         if self.selected_matriculas:
-            self.tree.selection_set(list(self.selected_matriculas))  
+            self.tree.selection_set(list(self.selected_matriculas))
         else:
-            self.tree.selection_set([]) 
+            self.tree.selection_set([])
 
-        self.update_context_buttons() 
-        
+        self.update_context_buttons()
+
     def _prompt_pdf_ordenacao(self):
         """Abre o pop-up para escolher a ordenação e chama a exportação,
-           garantindo que o pop-up apareça dentro da tela."""
+        garantindo que o pop-up apareça dentro da tela."""
         if self.ultima_escala_gerada is None:
-            messagebox.showwarning("Aviso", "Gere uma prévia da escala antes de exportar.", parent=self)
+            messagebox.showwarning(
+                "Aviso", "Gere uma prévia da escala antes de exportar.", parent=self
+            )
             return
 
         try:
@@ -1024,25 +1056,27 @@ class GeradorEscalaView(ctk.CTkFrame):
             mes_nome_arquivo = mes_str.lower()
             mes = list(self.meses_map.keys()).index(mes_str) + 1
         except (ValueError, AttributeError, IndexError):
-            messagebox.showerror("Erro", "Não foi possível obter o mês e ano selecionados.", parent=self)
+            messagebox.showerror(
+                "Erro", "Não foi possível obter o mês e ano selecionados.", parent=self
+            )
             return
         # --- Calcula a posição do pop-up com verificação de limites ---
-        self.update_idletasks() # Garante coordenadas atualizadas
+        self.update_idletasks()  # Garante coordenadas atualizadas
 
         # Coordenadas do botão
         btn_x = self.pdf_button.winfo_rootx()
         btn_y = self.pdf_button.winfo_rooty()
         btn_height = self.pdf_button.winfo_height()
-        btn_width = self.pdf_button.winfo_width() # Pega a largura do botão também
+        btn_width = self.pdf_button.winfo_width()  # Pega a largura do botão também
 
         # Dimensões do pop-up (devem ser as mesmas definidas em OrdenacaoPdfDialog)
         popup_width = 300
         popup_height = 180
-        margin = 10 # Margem de segurança da borda da tela
+        margin = 10  # Margem de segurança da borda da tela
 
         # Posição inicial desejada (abaixo e alinhado à esquerda do botão)
         tentative_x = btn_x
-        tentative_y = btn_y + btn_height + 5 # Adiciona 5px de espaço vertical
+        tentative_y = btn_y + btn_height + 5  # Adiciona 5px de espaço vertical
 
         # Dimensões da tela
         screen_width = self.winfo_screenwidth()
@@ -1054,7 +1088,7 @@ class GeradorEscalaView(ctk.CTkFrame):
             tentative_x = btn_x + btn_width - popup_width
             # Se ainda sair pela esquerda (tela muito estreita), ajusta
             if tentative_x < margin:
-                 tentative_x = margin
+                tentative_x = margin
 
         # Ajusta Y se sair por baixo
         if tentative_y + popup_height > screen_height - margin:
@@ -1063,10 +1097,9 @@ class GeradorEscalaView(ctk.CTkFrame):
             # Se ainda sair por cima (tela muito baixa), ajusta
             if tentative_y < margin:
                 tentative_y = margin
-                
+
         final_x = max(margin, tentative_x)
         final_y = max(margin, tentative_y)
-
 
         # Passa as coordenadas FINAIS para o diálogo
         dialog = OrdenacaoPdfDialog(self, x=final_x, y=final_y)
@@ -1089,28 +1122,43 @@ class GeradorEscalaView(ctk.CTkFrame):
             if not caminho_arquivo:
                 return
 
-            usuario_logado = "Usuário Desconhecido" # Valor padrão
+            usuario_logado = self.username_logado if self.username_logado else "Usuário Desconhecido"
             try:
-                if hasattr(self.app_controller, 'get_user_by_username'):
-                     user_info = self.app_controller.get_user_by_username()
-                     if user_info:
-                         usuario_logado = user_info
+                # Verifica se app_controller tem o atributo current_user e se ele não está vazio
+                if hasattr(self.app_controller, 'current_user') and self.app_controller.current_user:
+                     usuario_logado = self.app_controller.current_user # Usa o username armazenado
             except Exception as e:
                 print(f"Aviso: Não foi possível obter o nome do usuário logado: {e}")
-            
+
             try:
                 exporters.exportar_para_pdf(
-                    self.ultima_escala_gerada, ano, mes, caminho_arquivo,
+                    self.ultima_escala_gerada,
+                    ano,
+                    mes,
+                    caminho_arquivo,
                     ordenar_por=ordenacao,
-                    gerado_por_usuario=usuario_logado
+                    gerado_por_usuario=usuario_logado,
                 )
-                messagebox.showinfo("Sucesso", f"PDF exportado com sucesso para:\n{caminho_arquivo}", parent=self)
+                messagebox.showinfo(
+                    "Sucesso",
+                    f"PDF exportado com sucesso para:\n{caminho_arquivo}",
+                    parent=self,
+                )
                 try:
                     diretorio = os.path.dirname(caminho_arquivo)
-                    if sys.platform == "win32": os.startfile(diretorio)
-                    elif sys.platform == "darwin": subprocess.Popen(["open", diretorio])
-                    else: subprocess.Popen(["xdg-open", diretorio])
+                    if sys.platform == "win32":
+                        os.startfile(diretorio)
+                    elif sys.platform == "darwin":
+                        subprocess.Popen(["open", diretorio])
+                    else:
+                        subprocess.Popen(["xdg-open", diretorio])
                 except Exception as open_err:
-                    print(f"Não foi possível abrir a pasta do arquivo automaticamente: {open_err}")
+                    print(
+                        f"Não foi possível abrir a pasta do arquivo automaticamente: {open_err}"
+                    )
             except Exception as e:
-                messagebox.showerror("Erro na Exportação", f"Ocorreu um erro ao gerar o PDF:\n{e}", parent=self)
+                messagebox.showerror(
+                    "Erro na Exportação",
+                    f"Ocorreu um erro ao gerar o PDF:\n{e}",
+                    parent=self,
+                )

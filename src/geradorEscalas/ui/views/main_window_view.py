@@ -249,7 +249,7 @@ class MainView(ctk.CTkFrame):
         
 
     def show_escala_wizard(self):
-        self._show_content(GeradorEscalaView, app_controller=self.app_controller)
+        self._show_content(GeradorEscalaView, app_controller=self.app_controller, username_logado=self.username)
 
     def show_colaboradores_view(self, invalid_rows=None):
         self._show_content(
