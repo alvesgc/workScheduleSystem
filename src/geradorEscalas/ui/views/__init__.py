@@ -6,3 +6,4 @@ from .cadastro_manual_view import CadastroManualView
 from .edicao_lote_view import EdicaoEmLoteView
 from .gerenciar_colaboradores_view import GerenciarColaboradoresView
 from .gerador_escala_view import GeradorEscalaView
+from .gerenciar_sistema_view import GerenciarSistemaView

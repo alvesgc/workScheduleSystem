@@ -11,6 +11,7 @@ from .gerenciar_colaboradores_view import GerenciarColaboradoresView
 from .cadastro_manual_view import CadastroManualView
 from .edicao_lote_view import EdicaoEmLoteView
 from .gerador_escala_view import GeradorEscalaView
+from .gerenciar_sistema_view import GerenciarSistemaView  # NOVA IMPORTAÇÃO
 
 
 class MainView(ctk.CTkFrame):
@@ -20,36 +21,26 @@ class MainView(ctk.CTkFrame):
         self.sidebar_expanded = True
         self.user_data = user_data
         self.username = self.user_data.get("username", "Usuário").title()
+        
+        # VERIFICAR SE O USUÁRIO É ADMINISTRADOR
+        self.is_admin = self.user_data.get("role") == "admin"
 
         # === PALETA DE CORES HIERÁRQUICA ===
-        # Cores primárias
         PRIMARY = "#0078D7"
         PRIMARY_HOVER = "#005EA6"
-
-        # Cores de superfície
         SURFACE = "#FFFFFF"
         SURFACE_SECONDARY = "#FAFAFA"
         BACKGROUND = "#F5F6FA"
-
-        # Bordas e divisores
         BORDER = "#E1E4E8"
         BORDER_LIGHT = "#F0F0F0"
-
-        # Textos
         TEXT_PRIMARY = "#1E1E1E"
         TEXT_SECONDARY = "#6B6B6B"
         TEXT_TERTIARY = "#9CA3AF"
-
-        # Botões de navegação
         NAV_INACTIVE_BG = "#F3F4F6"
         NAV_INACTIVE_HOVER = "#E5E7EB"
         NAV_INACTIVE_TEXT = "#4B5563"
-
-        # Ícones
         ICON_INACTIVE = "#6B7280"
         ICON_ACTIVE = "#FFFFFF"
-
-        # Botão de sair (danger)
         DANGER = "#DC2626"
         DANGER_HOVER = "#B91C1C"
 
@@ -68,7 +59,7 @@ class MainView(ctk.CTkFrame):
         )
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_propagate(False)
-        self.sidebar_frame.grid_rowconfigure(5, weight=1)
+        self.sidebar_frame.grid_rowconfigure(6, weight=1)  # Alterado de 5 para 6
 
         # === ÍCONES COLORIDOS ===
         icon_size = 20
@@ -92,45 +83,39 @@ class MainView(ctk.CTkFrame):
             "users_inactive": fa.icon_to_image(
                 "users", fill=ICON_INACTIVE, scale_to_height=icon_size
             ),
+            # NOVOS ÍCONES PARA ADMIN
+            "cog_active": fa.icon_to_image(
+                "cog", fill=ICON_ACTIVE, scale_to_height=icon_size
+            ),
+            "cog_inactive": fa.icon_to_image(
+                "cog", fill=ICON_INACTIVE, scale_to_height=icon_size
+            ),
             "logout": fa.icon_to_image(
                 "sign-out-alt", fill=ICON_ACTIVE, scale_to_height=icon_size
             ),
         }
 
-        # === LOGO  ===
+        # === LOGO ===
         logo_path = resource_path(os.path.join("src", "geradorEscalas", "assets", "logo.png"))
 
         try:
             pil_logo = PIL_Image.open(logo_path)
-            max_size = (160, 80)  # limite máximo de largura e altura
-            pil_logo.thumbnail(
-                max_size, PIL_Image.Resampling.LANCZOS
-            )  # mantém proporção
-            pil_logo = ImageOps.contain(
-                pil_logo, max_size
-            )  # garante encaixe sem distorção
-
+            max_size = (160, 80)
+            pil_logo.thumbnail(max_size, PIL_Image.Resampling.LANCZOS)
+            pil_logo = ImageOps.contain(pil_logo, max_size)
             self.company_logo = ctk.CTkImage(
                 light_image=pil_logo,
                 dark_image=pil_logo,
-                size=pil_logo.size,  # usa o tamanho real, sem forçar
+                size=pil_logo.size,
             )
         except Exception:
             self.company_logo = fa.icon_to_image(
                 "building", fill="#6B7280", scale_to_height=56
             )
 
-        logo_container = ctk.CTkFrame(
-            self.sidebar_frame,
-            fg_color="transparent",
-        )
+        logo_container = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
         logo_container.grid(row=0, column=0, sticky="ew", padx=20, pady=(28, 20))
-
-        ctk.CTkLabel(
-            logo_container,
-            text="",  # sem texto, apenas a imagem
-            image=self.company_logo,
-        ).pack(pady=(0, 0))
+        ctk.CTkLabel(logo_container, text="", image=self.company_logo).pack(pady=(0, 0))
 
         # Divisor abaixo da logo
         divider_top = ctk.CTkFrame(self.sidebar_frame, height=1, fg_color=BORDER_LIGHT)
@@ -152,17 +137,14 @@ class MainView(ctk.CTkFrame):
         # === BOTÕES DE NAVEGAÇÃO ===
         self.nav_buttons = {}
 
+        # Botões comuns a todos os usuários
         button_info = [
             ("home", "  Início", "home", self.show_home_view, 2),
             ("escala", "  Gerar Escala", "calendar", self.show_escala_wizard, 3),
-            (
-                "colaboradores",
-                "  Colaboradores",
-                "users",
-                self.show_colaboradores_view,
-                4,
-            ),
+            ("colaboradores", "  Colaboradores", "users", self.show_colaboradores_view, 4),
         ]
+
+        current_row = 5  # Próxima linha após os botões comuns
 
         for name, text, icon_key, command, row in button_info:
             button = ctk.CTkButton(
@@ -172,9 +154,7 @@ class MainView(ctk.CTkFrame):
                 compound="left",
                 anchor="w",
                 font=fonts.BUTTON_FONT,
-                command=lambda cmd=command, btn_name=name: self._navigate(
-                    cmd, btn_name
-                ),
+                command=lambda cmd=command, btn_name=name: self._navigate(cmd, btn_name),
                 height=44,
                 corner_radius=8,
                 border_spacing=10,
@@ -183,11 +163,39 @@ class MainView(ctk.CTkFrame):
             button.grid(row=row, column=0, padx=16, pady=4, sticky="ew")
             self.nav_buttons[name] = button
 
+        # === BOTÃO ADMIN (CONDICIONAL) ===
+        if self.is_admin:
+            # Adicionar divisor antes do botão admin
+            divider_admin = ctk.CTkFrame(
+                self.sidebar_frame, height=1, fg_color=BORDER_LIGHT
+            )
+            divider_admin.grid(row=current_row, column=0, sticky="ew", padx=20, pady=8)
+            current_row += 1
+
+            # Botão Gerenciar Sistema
+            admin_button = ctk.CTkButton(
+                self.sidebar_frame,
+                text="  Gerenciar Sistema",
+                image=self.icons_colored["cog_inactive"],
+                compound="left",
+                anchor="w",
+                font=fonts.BUTTON_FONT,
+                command=lambda: self._navigate(self.show_gerenciar_sistema_view, "admin"),
+                height=44,
+                corner_radius=8,
+                border_spacing=10,
+            )
+            admin_button.configure(**self.style_inactive)
+            admin_button.grid(row=current_row, column=0, padx=16, pady=4, sticky="ew")
+            self.nav_buttons["admin"] = admin_button
+            current_row += 1
+
         # === DIVISOR ANTES DO LOGOUT ===
         divider_bottom = ctk.CTkFrame(
             self.sidebar_frame, height=1, fg_color=BORDER_LIGHT
         )
-        divider_bottom.grid(row=5, column=0, sticky="ew", padx=20, pady=8)
+        divider_bottom.grid(row=current_row, column=0, sticky="ew", padx=20, pady=8)
+        current_row += 1
 
         # === BOTÃO DE SAIR ===
         self.logout_button = ctk.CTkButton(
@@ -205,7 +213,7 @@ class MainView(ctk.CTkFrame):
             corner_radius=8,
             border_spacing=10,
         )
-        self.logout_button.grid(row=6, column=0, padx=16, pady=(0, 16), sticky="ew")
+        self.logout_button.grid(row=current_row, column=0, padx=16, pady=(0, 16), sticky="ew")
 
         # === ÁREA DE CONTEÚDO ===
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -223,14 +231,19 @@ class MainView(ctk.CTkFrame):
 
     def _highlight_button(self, active_button_name):
         for name, button in self.nav_buttons.items():
-            icon_key = (
-                "home"
-                if name == "home"
-                else ("calendar" if name == "escala" else "users")
-            )
+            # Mapear ícones
+            icon_map = {
+                "home": "home",
+                "escala": "calendar",
+                "colaboradores": "users",
+                "admin": "cog"
+            }
+            icon_key = icon_map.get(name, "home")
+            
             if name == active_button_name:
                 button.configure(
-                    **self.style_active, image=self.icons_colored[f"{icon_key}_active"]
+                    **self.style_active, 
+                    image=self.icons_colored[f"{icon_key}_active"]
                 )
             else:
                 button.configure(
@@ -246,7 +259,6 @@ class MainView(ctk.CTkFrame):
 
     def show_home_view(self):
         self._show_content(HomeView, app_controller=self.app_controller, main_view=self)
-        
 
     def show_escala_wizard(self):
         self._show_content(GeradorEscalaView, app_controller=self.app_controller, username_logado=self.username)
@@ -266,12 +278,27 @@ class MainView(ctk.CTkFrame):
             matricula_para_editar=matricula_para_editar,
         )
 
-    # --- MÉTODO NOVO ADICIONADO AQUI ---
     def show_edicao_lote_view(self, dados_selecionados):
         self._show_content(
             EdicaoEmLoteView,
             app_controller=self.app_controller,
             dados_para_editar=dados_selecionados,
+        )
+
+    # === NOVO MÉTODO PARA TELA ADMIN ===
+    def show_gerenciar_sistema_view(self):
+        """Exibe a tela de gerenciamento do sistema (apenas para admins)"""
+        if not self.is_admin:
+            messagebox.showerror(
+                "Acesso Negado",
+                "Você não tem permissão para acessar esta área.",
+                parent=self
+            )
+            return
+        
+        self._show_content(
+            GerenciarSistemaView,
+            app_controller=self.app_controller
         )
 
     def logout(self):

@@ -48,8 +48,6 @@ def run_import_colaboradores(parent_window):
     ]
     try:
         df = pd.read_excel(filepath)
-        # --- LINHA DE CORREÇÃO ADICIONADA ---
-        # Substitui todos os valores NaN (nulos) por None, que vira NULL no SQL
         df = df.replace({np.nan: None})
 
         missing_columns = [col for col in required_columns if col not in df.columns]
@@ -127,7 +125,6 @@ class App(ctk.CTk):
         style.theme_use("clam")
         fonts.init_fonts()
 
-        # Este comando vai imprimir o caminho exato da pasta da biblioteca tksvg
         print(os.path.dirname(tksvg.__file__))
         try:
             font_path = resource_path(
@@ -140,18 +137,19 @@ class App(ctk.CTk):
             print("Os ícones podem não ser exibidos corretamente.")
 
         self.title("Acesso ao Sistema")
-        self.geometry("400x600")  # Tamanho fixo e menor para o login
-        self.resizable(False, False)  # A tela de login não deve ser redimensionável
-        self.center_window()  # Nova função para centralizar a janela
+        self.geometry("400x600")
+        self.resizable(False, False)
+        self.center_window()
         self.protocol("WM_DELETE_WINDOW", self.quit)
 
         self.current_view = None
+        self.current_user_info = None  # ← IMPORTANTE: Inicializa antes do login
+        self.username = None  # ← NOVO: Para compatibilidade
         self.show_login_view()
-        self.current_user_info = None
 
     def center_window(self):
         """Centraliza a janela atual no meio da tela."""
-        self.update_idletasks()  # Garante que as dimensões da janela estejam atualizadas
+        self.update_idletasks()
         width = self.winfo_width()
         height = self.winfo_height()
         x = (self.winfo_screenwidth() // 2) - (width // 2)
@@ -167,7 +165,11 @@ class App(ctk.CTk):
             self.geometry("1280x720")
             self.resizable(True, True)
             self.center_window()
+
+            # ← ATUALIZADO: Armazena informações do usuário
             self.current_user_info = user
+            self.username = username  # ← NOVO: Para compatibilidade
+
             self.show_main_view()
         else:
             messagebox.showerror(
@@ -181,7 +183,7 @@ class App(ctk.CTk):
                 MainView,
                 app_controller=self,
                 user_data=self.current_user_info,
-                app_version=APP_VERSION,  # <-- Passa a versão para a MainView
+                app_version=APP_VERSION,
             )
         else:
             messagebox.showerror(
@@ -190,7 +192,8 @@ class App(ctk.CTk):
             self.show_login_view()
 
     def logout(self):
-        self.current_user_info = None  # Limpa o usuário ao sair
+        self.current_user_info = None
+        self.username = None  # ← NOVO: Limpa também o username
         self.geometry("400x600")
         self.resizable(False, False)
         self.show_login_view()
@@ -208,7 +211,6 @@ class App(ctk.CTk):
         if self.current_view:
             self.current_view.destroy()
 
-        # Agora, o método apenas cria a view com os argumentos que recebeu.
         self.current_view = ViewClass(self, *args, **kwargs)
         self.current_view.pack(expand=True, fill="both")
 
@@ -218,14 +220,12 @@ class App(ctk.CTk):
         reg_window.geometry("400x600")
         reg_window.resizable(False, False)
 
-        reg_window.update_idletasks()  # Força a atualização das dimensões da janela
+        reg_window.update_idletasks()
         width = reg_window.winfo_width()
         height = reg_window.winfo_height()
         x = (reg_window.winfo_screenwidth() // 2) - (width // 2)
         y = (reg_window.winfo_screenheight() // 2) - (height // 2)
-        reg_window.geometry(
-            f"{width}x{height}+{x}+{y}"
-        )  # Define a posição centralizada
+        reg_window.geometry(f"{width}x{height}+{x}+{y}")
 
         view = UserRegistrationView(
             reg_window,
@@ -239,34 +239,28 @@ class App(ctk.CTk):
         reg_window.focus()
 
     def on_save_colaborador(self, dados, matricula_original=None):
-        """
-        Salva um novo colaborador ou atualiza um existente.
-        """
-        if matricula_original:  # Modo de Edição
-            # Remove a matrícula dos 'dados' se ela existir, pois não deve ser alterada
+        """Salva um novo colaborador ou atualiza um existente."""
+        if matricula_original:
             dados.pop("matricula", None)
             success, message = db.update_collaborator(matricula_original, dados)
-        else:  # Modo de Adição
+        else:
             success, message = db.add_colaborador(dados)
 
         if success:
             messagebox.showinfo("Sucesso", message, parent=self)
-            # Após salvar, atualiza e volta para a tela de gerenciamento
             if isinstance(self.current_view, MainView):
                 self.current_view.show_colaboradores_view()
         else:
             messagebox.showerror("Erro ao Salvar", message, parent=self)
 
     def on_save_user(self, data, window_to_close):
-        """--- REFATORADO: Lógica unificada para salvar usuário com ou sem foto ---"""
+        """Salva usuário com validação de formato"""
         username = data.get("username")
         password = data.get("password")
         confirm_password = data.get("confirm_password")
         role = data.get("role")
         original_photo_path = data.get("photo_path")
 
-        # --- 1. VALIDAÇÃO DO FORMATO DO NOME DE USUÁRIO (NICKNAME) ---
-        # Permite apenas letras (a-z, A-Z), números (0-9), underscore (_) e hífen (-).
         if not re.match("^[a-zA-Z0-9_-]+$", username):
             messagebox.showerror(
                 "Nome de Usuário Inválido",
@@ -318,7 +312,7 @@ class App(ctk.CTk):
         else:
             messagebox.showerror("Erro no Cadastro", message, parent=window_to_close)
 
-    # --- Métodos de Navegação chamados pela MainView ---
+    # --- MÉTODOS DE NAVEGAÇÃO ---
     def show_home_view(self):
         if isinstance(self.current_view, MainView):
             self.current_view.show_home_view()
@@ -331,14 +325,50 @@ class App(ctk.CTk):
         if isinstance(self.current_view, MainView):
             self.current_view.show_colaboradores_view()
 
-    # --- MÉTODO ADICIONADO ---
     def show_cadastro_manual_view(self, matricula_para_editar=None):
         """Abre a tela de cadastro/edição manual diretamente."""
-        # Esta função agora usa o _show_view para trocar o conteúdo da MainView
         if isinstance(self.current_view, MainView):
             self.current_view.show_cadastro_manual_view(
                 matricula_para_editar=matricula_para_editar
             )
+
+    # ═══════════════════════════════════════════════════════════
+    # NOVOS MÉTODOS PARA GERENCIAMENTO DE USUÁRIOS (ADMIN)
+    # ═══════════════════════════════════════════════════════════
+
+    def get_all_users(self):
+        """Retorna todos os usuários do sistema"""
+        return db.get_all_users()
+
+    def create_user(self, username, password, role, photo_path=None):
+        """Cria um novo usuário"""
+        return db.create_user(username, password, role, photo_path)
+
+    def update_user_role(self, user_id, new_role):
+        """Atualiza o perfil de um usuário"""
+        return db.update_user_role(user_id, new_role)
+
+    def delete_user(self, user_id):
+        """Exclui um usuário"""
+        return db.delete_user(user_id)
+
+    def change_user_password(self, user_id, new_password):
+        """Altera a senha de um usuário"""
+        return db.change_user_password(user_id, new_password)
+
+    def get_current_username(self):
+        """Retorna o username do usuário logado"""
+        return self.username if hasattr(self, "username") and self.username else None
+
+    def is_admin(self):
+        """Verifica se o usuário atual é admin"""
+        if self.current_user_info:
+            return self.current_user_info.get("role") == "admin"
+        return False
+
+    # ═══════════════════════════════════════════════════════════
+    # FIM DOS NOVOS MÉTODOS ADMIN
+    # ═══════════════════════════════════════════════════════════
 
     def on_import_colaboradores(self):
         filepath = filedialog.askopenfilename(
@@ -524,10 +554,7 @@ class App(ctk.CTk):
             self.current_view.show_edicao_lote_view(dados_selecionados)
 
     def on_batch_update(self, matriculas, changes):
-        """
-        Recebe um dicionário de mudanças e aplica cada uma em lote.
-        Ex: changes = {'setor': 'UTI', 'cargo': 'ENFERMEIRO JR'}
-        """
+        """Aplica mudanças em lote para múltiplos colaboradores"""
         for field, new_value in changes.items():
             success, message = db.batch_update_collaborators(
                 matriculas, field, new_value
@@ -536,7 +563,7 @@ class App(ctk.CTk):
                 messagebox.showerror(
                     "Erro na Atualização em Lote", message, parent=self
                 )
-                return  # Interrompe em caso de erro
+                return
 
         messagebox.showinfo(
             "Sucesso",
@@ -544,12 +571,11 @@ class App(ctk.CTk):
             parent=self,
         )
 
-        # Volta para a tela de gerenciamento atualizada
         if isinstance(self.current_view, MainView):
             self.current_view.show_colaboradores_view()
 
     def on_save_escala_historico(self, dados_escala, mes, ano):
-        """Chama a função do banco de dados para salvar a escala e exibe o resultado."""
+        """Salva a escala no histórico"""
         success, message = db.salvar_escala_no_historico(dados_escala, ano, mes)
         if success:
             messagebox.showinfo("Sucesso", message, parent=self.current_view)

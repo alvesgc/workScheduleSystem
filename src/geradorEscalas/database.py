@@ -246,9 +246,6 @@ def get_user_by_username(username):
 
 def get_current_user_name(self):
     """Retorna o nome do usuário atualmente logado."""
-    print(f"DEBUG get_current_user_name: Iniciando...")
-    print(f"DEBUG: Tem username? {hasattr(self, 'username')}")
-    
     if hasattr(self, 'username'):
         print(f"DEBUG: self.username = {self.username}")
     
@@ -833,4 +830,173 @@ def atualizar_data_base_e_sequencia_padrao(matricula, nova_data_base_str):
 
     except Exception as e:
         print(f"Erro ao atualizar a escala: {e}")
+        return False
+    
+def get_all_users():
+    """Retorna todos os usuários do sistema"""
+    if not engine:
+        print("ERRO: Engine não disponível em get_all_users")
+        return []
+    
+    try:
+        with engine.connect() as connection:
+            query = text("""
+                SELECT id, username, role, foto_path 
+                FROM usuarios 
+                ORDER BY username
+            """)
+            
+            result = connection.execute(query).fetchall()
+            users = []
+            for row in result:
+                users.append({
+                    'id': row[0],
+                    'username': row[1],
+                    'role': row[2],
+                    'foto_path': row[3]
+                })
+            
+            print(f"✓ get_all_users: {len(users)} usuários encontrados")
+            return users
+    except Exception as e:
+        print(f"ERRO em get_all_users: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+
+def create_user(username, password, role, photo_path=None):
+    """
+    Cria um novo usuário no sistema.
+    Esta é uma função wrapper que usa a função add_user já existente.
+    """
+    print(f"create_user chamado: username={username}, role={role}")
+    return add_user(username, password, role, photo_path)
+
+
+def update_user_role(user_id, new_role):
+    """Atualiza o perfil (role) de um usuário"""
+    if not engine:
+        return False, "Motor de conexão não está disponível."
+    
+    # Validar role
+    if new_role not in ['user', 'admin']:
+        return False, "Perfil inválido. Use 'user' ou 'admin'."
+    
+    print(f"update_user_role: user_id={user_id}, new_role={new_role}")
+    
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            query = text("""
+                UPDATE usuarios 
+                SET role = :role
+                WHERE id = :user_id
+            """)
+            
+            result = connection.execute(query, {"role": new_role, "user_id": user_id})
+            trans.commit()
+            
+            print(f"✓ Usuário {user_id} atualizado para role '{new_role}'")
+            return True, "Perfil atualizado com sucesso."
+        except Exception as e:
+            trans.rollback()
+            print(f"ERRO em update_user_role: {e}")
+            return False, f"Erro ao atualizar perfil: {e}"
+
+
+def delete_user(user_id):
+    """Exclui um usuário do sistema"""
+    if not engine:
+        return False, "Motor de conexão não está disponível."
+    
+    print(f"delete_user: Tentando excluir user_id={user_id}")
+    
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            # Verificar se não é o único admin
+            check_query = text("""
+                SELECT role FROM usuarios WHERE id = :user_id
+            """)
+            user_role = connection.execute(check_query, {"user_id": user_id}).fetchone()
+            
+            if user_role and user_role[0] == 'admin':
+                # Contar quantos admins existem
+                count_query = text("""
+                    SELECT COUNT(*) FROM usuarios WHERE role = 'admin'
+                """)
+                admin_count = connection.execute(count_query).scalar()
+                
+                print(f"  Usuário é admin. Total de admins: {admin_count}")
+                
+                if admin_count <= 1:
+                    print("  ✗ Bloqueado: último admin")
+                    return False, "Não é possível excluir o último administrador do sistema!"
+            
+            # Excluir o usuário
+            delete_query = text("DELETE FROM usuarios WHERE id = :user_id")
+            result = connection.execute(delete_query, {"user_id": user_id})
+            
+            trans.commit()
+            print(f"✓ Usuário {user_id} excluído com sucesso")
+            return True, "Usuário excluído com sucesso."
+        except Exception as e:
+            trans.rollback()
+            print(f"ERRO em delete_user: {e}")
+            return False, f"Erro ao excluir usuário: {e}"
+
+
+def change_user_password(user_id, new_password):
+    """Altera a senha de um usuário"""
+    if not engine:
+        return False, "Motor de conexão não está disponível."
+    
+    print(f"change_user_password: user_id={user_id}")
+    
+    with engine.connect() as connection:
+        trans = connection.begin()
+        try:
+            # Criptografar a nova senha com bcrypt
+            hashed_password = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt())
+            
+            query = text("""
+                UPDATE usuarios 
+                SET password_hash = :password_hash
+                WHERE id = :user_id
+            """)
+            
+            connection.execute(query, {
+                "password_hash": hashed_password.decode("utf-8"),
+                "user_id": user_id
+            })
+            
+            trans.commit()
+            print(f"✓ Senha do usuário {user_id} alterada com sucesso")
+            return True, "Senha alterada com sucesso."
+        except Exception as e:
+            trans.rollback()
+            print(f"ERRO em change_user_password: {e}")
+            return False, f"Erro ao alterar senha: {e}"
+
+
+def verificar_permissao_admin(username):
+    """Verifica se um usuário é administrador"""
+    if not engine:
+        return False
+    
+    try:
+        with engine.connect() as connection:
+            query = text("SELECT role FROM usuarios WHERE username = :username")
+            result = connection.execute(query, {"username": username}).fetchone()
+            
+            if result:
+                is_admin = result[0] == 'admin'
+                print(f"verificar_permissao_admin: {username} -> {is_admin}")
+                return is_admin
+            
+            print(f"verificar_permissao_admin: {username} não encontrado")
+            return False
+    except Exception as e:
+        print(f"ERRO em verificar_permissao_admin: {e}")
         return False
